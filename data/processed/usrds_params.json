@@ -1,0 +1,22 @@
+{
+  "adjusted_incidence_per_million_2022": 363,
+  "irr_black_vs_white": 2.9,
+  "irr_hispanic_vs_white": 1.3,
+  "irr_asian_vs_white": 1.1,
+  "irr_aian_vs_white": 1.2,
+  "lifetime_risk_male_overall": 0.04,
+  "lifetime_risk_female_overall": 0.029,
+  "lifetime_risk_black_male": 0.081,
+  "lifetime_risk_black_female": 0.068,
+  "lifetime_risk_white_male": 0.034,
+  "lifetime_risk_white_female": 0.023,
+  "hd_1yr_mortality": 0.22,
+  "hd_3yr_survival": 0.57,
+  "hd_5yr_survival": 0.42,
+  "pd_3yr_survival": 0.68,
+  "pd_5yr_survival": 0.52,
+  "hd_annual_mort_postyear1": 0.17,
+  "remaining_life_dialysis_age4044": 8.0,
+  "remaining_life_dialysis_age5054": 6.0,
+  "remaining_life_dialysis_age6064": 4.5
+}
