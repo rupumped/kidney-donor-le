@@ -33,3 +33,4 @@ Thumbs.db
 # Processed parameter files ARE committed (small, reproducible)
 # Uncomment the line below if you want to exclude them too:
 # data/processed/
+.claude/agentcheck/reports/

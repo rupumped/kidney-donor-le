@@ -23,6 +23,7 @@ import sys
 import json
 from pathlib import Path
 
+# Allow running from repo root or src/
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import DATA_PROC
 

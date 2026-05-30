@@ -6,7 +6,7 @@ import json
 import numpy as np
 from pathlib import Path
 
-# ── Repo-relative paths ───────────────────────────────────────────────────────
+# ── REPO-RELATIVE PATHS ───────────────────────────────────────────────────────
 REPO_ROOT  = Path(__file__).resolve().parent.parent
 DATA_RAW   = REPO_ROOT / "data" / "raw"
 DATA_PROC  = REPO_ROOT / "data" / "processed"
@@ -16,7 +16,7 @@ for _p in (DATA_RAW, DATA_PROC, RESULTS):
     _p.mkdir(parents=True, exist_ok=True)
 
 
-# ── Life table helpers ────────────────────────────────────────────────────────
+# ── LIFE TABLE HELPERS ────────────────────────────────────────────────────────
 def load_life_table(path: Path = None) -> np.ndarray:
     """
     Load age-specific annual probability of death (qx) from a CSV produced
@@ -40,7 +40,7 @@ def load_life_table(path: Path = None) -> np.ndarray:
         return np.clip(A + B * np.exp(c * ages), 0.0, 1.0)
 
 
-# ── Parameter I/O ─────────────────────────────────────────────────────────────
+# ── PARAMETER I/O ─────────────────────────────────────────────────────────────
 def load_params(path: Path = None) -> dict:
     """Load assembled parameters from params.json, or return hard-coded
     base-case values if the file does not yet exist."""
@@ -68,7 +68,7 @@ def _hardcoded_base_params() -> dict:
     Sources documented inline — see README and src/04_literature_params.py.
     """
     return {
-        # ── ESRD risk ─────────────────────────────────────────────────────
+        # ── ESRD RISK ─────────────────────────────────────────────────────
         # Muzaale 2014, JAMA 311:579 (Table 2 / PMC full text)
         "esrd_15yr_donor_overall":  0.0031,   # 30.8/10,000 at 15 yr
         "esrd_15yr_donor_black":    0.00747,  # 74.7/10,000 at 15 yr
@@ -88,40 +88,47 @@ def _hardcoded_base_params() -> dict:
         "hr_male_sex":              1.88,   # 95% CI 1.50–2.35
         "hr_age_per_decade_nonblack": 1.40, # 95% CI 1.23–1.59 (non-Black only)
 
-        # ── Dialysis / ESRD survival ──────────────────────────────────────
+        # ── DIALYSIS / ESRD SURVIVAL ──────────────────────────────────────
         # USRDS ADR 2023 / Renal Fellow Network USRDS summary
         "dialysis_1yr_mort":        0.22,   # first year on HD
         "dialysis_annual_mort":     0.17,   # subsequent years (from 5-yr surv 42%)
 
-        # ── Waitlist outcomes ─────────────────────────────────────────────
-        # SRTR 2022 ADR, Figure KI 24
-        "wl_mort_per_100py":        5.4,    # deaths/100 patient-years, standard
-        "wl_mort_black_per_100py":  6.5,    # approximate from SRTR Figure KI 25
-        "wl_mort_white_per_100py":  5.0,
+        # ── WAITLIST OUTCOMES ─────────────────────────────────────────────
+        # SRTR 2023 ADR, Figure KI 24
+        "wl_mort_per_100py":        5.0,    # deaths/100 patient-years (2023 value)
+        "wl_mort_black_per_100py":  4.62,   # SRTR 2023 Figure KI 25
+        "wl_mort_white_per_100py":  5.71,
 
-        # SRTR 2022 ADR / Schold AJT 2023 — post-KAS250 (March 2021)
+        # SRTR 2023 ADR / Schold AJT 2023 — post-KAS250 (March 2021)
         "wl_std_median_days":       985,    # ~32.8 months overall
         # Wainright 2017 AJT 17:1103 + UNOS conference abstract
         "wl_pld_median_days":       100,    # prior living donors post-KAS
 
-        # SRTR 2022 ADR Figure KI 22: 3-yr cohort listed 2017–2019
-        "wl_removal_rate_yr":       0.064,  # ~6.4%/yr competing removal
+        # SRTR 2023 ADR Figure KI 22: 3-yr cohort listed 2017–2019
+        # Assembled value: 6.81%/yr; ~6.4%/yr was the 2022 ADR estimate
+        "wl_removal_rate_yr":       0.0681, # 6.81%/yr competing removal (SRTR 2023)
 
-        # ── Post-transplant outcomes ──────────────────────────────────────
-        # SRTR 2022 ADR, Table KI 11/12 (DDKT — used for ESRD arm)
-        "graft_5yr_age1834":        0.814,
-        "graft_5yr_age3564":        0.760,
-        "graft_5yr_age65p":         0.678,
+        # Fraction of dialysis survivors listed each cycle (approximate;
+        # higher for donor candidates due to pre-screening health)
+        "wl_listing_prob":          0.75,
 
-        # SRTR 2022 ADR approximate patient survival
-        "posttx_annual_mort":       0.052,  # ~1-(0.85^(1/3)) from 3-yr surv 85%
-        "posttx_annual_mort_black": 0.065,  # approximate from SRTR race data
-        "posttx_annual_mort_white": 0.048,
+        # ── POST-TRANSPLANT OUTCOMES ──────────────────────────────────────
+        # SRTR 2023 ADR DDKT patient survival — age-stratified annual mortality
+        # Derived as 1 - 5yr_surv^(1/5) for each age band
+        "posttx_annual_mort_age1834": 0.009,  # 1 - 0.957^0.2
+        "posttx_annual_mort_age3549": 0.018,  # 1 - 0.914^0.2
+        "posttx_annual_mort_age5064": 0.039,  # 1 - 0.820^0.2
+        "posttx_annual_mort_age65p":  0.068,  # 1 - 0.701^0.2
 
-        # Annual graft failure rate post year-1 (approximate)
+        # Overall: age-weighted average (weights approximate ESRD recipient mix)
+        "posttx_annual_mort":       0.036,  # ~weighted avg of age strata
+        "posttx_annual_mort_black": 0.035,  # SRTR 2023 DDKT race-stratified
+        "posttx_annual_mort_white": 0.038,
+
+        # Annual graft failure rate post year-1 (SRTR 2023)
         "graft_annual_fail_postyear1": 0.025,
 
-        # ── Background mortality ──────────────────────────────────────────
+        # ── BACKGROUND MORTALITY ──────────────────────────────────────────
         # CDC NVSR Vol 72 No 12 (Nov 2023) — 2021 US life tables
         # Full table loaded separately via load_life_table()
         # HR for donor all-cause mortality vs matched controls
@@ -133,7 +140,7 @@ def _hardcoded_base_params() -> dict:
     }
 
 
-# ── Statistical helpers ───────────────────────────────────────────────────────
+# ── STATISTICAL HELPERS ───────────────────────────────────────────────────────
 def beta_params_from_mean_se(mean: float, se_frac: float = 0.20):
     """Return (alpha, beta) for a Beta distribution with given mean and
     fractional SE. Clamps shape parameters to >= 0.5."""
@@ -144,11 +151,18 @@ def beta_params_from_mean_se(mean: float, se_frac: float = 0.20):
     return max(float(a), 0.5), max(float(b), 0.5)
 
 
-def weibull_annual_hazard(t: float, lam: float, k: float) -> float:
-    """Annual hazard at time t for Weibull(lambda, k). Returns 0 at t=0."""
-    if t <= 0:
+def weibull_annual_prob(t: float, lam: float, k: float) -> float:
+    """Annual ESRD transition probability for cycle [t, t+1] under Weibull(lambda, k).
+
+    Equals S(t) - S(t+1) where S(t) = exp(-(t/lambda)^k).  The sum over
+    t in [0, T-1] telescopes to exactly 1 - S(T), so calibration via
+    weibull_scale_from_cumrisk is consistent with these per-cycle draws.
+    """
+    if t < 0:
         return 0.0
-    return float(np.clip((k / lam) * (t / lam) ** (k - 1), 0, 0.5))
+    surv_t  = np.exp(-((t / lam) ** k))
+    surv_t1 = np.exp(-(((t + 1) / lam) ** k))
+    return float(np.clip(surv_t - surv_t1, 0.0, 1.0))
 
 
 def weibull_scale_from_cumrisk(cum_risk_15: float, k: float) -> float:
@@ -157,6 +171,40 @@ def weibull_scale_from_cumrisk(cum_risk_15: float, k: float) -> float:
       1 - exp(-(15/lambda)^k) = cum_risk_15
     """
     return 15.0 / (-np.log(1.0 - cum_risk_15)) ** (1.0 / k)
+
+
+def weibull_scale_from_cumrisk_competing(
+    cum_risk_15: float,
+    k: float,
+    life_table_qx: np.ndarray,
+    age_at_entry: int,
+    bg_hr: float = 1.0,
+) -> float:
+    """
+    Return Weibull scale lambda calibrated so the competing-risk-adjusted
+    15-year ESRD CIF equals cum_risk_15.
+
+    Accounts for background mortality depleting the ESRD-susceptible pool each
+    year; uses the same life table and bg_hr as the main simulation.
+    Solved by bisection (60 iterations → precision < 1e-12 for typical inputs).
+    """
+    def cr_cif(lam: float) -> float:
+        cif, s_bg = 0.0, 1.0
+        for t in range(15):
+            cif += s_bg * weibull_annual_prob(t, lam, k)
+            age  = min(age_at_entry + t, len(life_table_qx) - 1)
+            s_bg *= 1.0 - life_table_qx[age] * bg_hr
+        return cif
+
+    # cr_cif is monotonically decreasing in lam
+    lam_lo, lam_hi = 1.0, 10_000.0
+    for _ in range(60):
+        lam_mid = (lam_lo + lam_hi) / 2.0
+        if cr_cif(lam_mid) > cum_risk_15:
+            lam_lo = lam_mid
+        else:
+            lam_hi = lam_mid
+    return (lam_lo + lam_hi) / 2.0
 
 
 def median_to_annual_tx_prob(median_days: float) -> float:

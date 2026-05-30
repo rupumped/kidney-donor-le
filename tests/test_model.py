@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from utils import (load_life_table, _hardcoded_base_params,
-                   weibull_scale_from_cumrisk, weibull_annual_hazard,
+                   weibull_scale_from_cumrisk, weibull_annual_prob,
                    median_to_annual_tx_prob)
 
 # Import model functions without running main
@@ -51,57 +51,49 @@ class TestLifeTable:
 # ────────────────────────────────────────────────────────────────────────────
 class TestWeibullCalibration:
     """
-    The Weibull hazard must integrate over 15 yrs to reproduce Muzaale 2014 CIF.
-    Tolerance: ±5% of target (per design spec in parameter notes).
+    Annual transition probabilities must sum over 15 yrs to exactly reproduce
+    Muzaale 2014 CIF (the sum telescopes to 1 - S(15) by construction).
     """
 
     def _integrate_cif(self, cum_risk_15, k, years=15):
         lam = weibull_scale_from_cumrisk(cum_risk_15, k)
-        cumhaz = sum(weibull_annual_hazard(t, lam, k) for t in range(years))
-        return 1 - np.exp(-cumhaz)
+        # Sum of annual probabilities telescopes exactly to 1 - S(years)
+        return sum(weibull_annual_prob(t, lam, k) for t in range(years))
 
     def test_donor_overall_calibration(self):
         target = BASE["esrd_15yr_donor_overall"]
         achieved = self._integrate_cif(target, BASE["weibull_shape"])
-        # 10% tolerance: discrete annual cycles undercount vs continuous slightly
-        assert abs(achieved - target) / target < 0.10, \
+        assert abs(achieved - target) / target < 0.001, \
             f"Donor calibration off: target={target:.4%}, achieved={achieved:.4%}"
 
     def test_nondonor_calibration(self):
         target = BASE["esrd_15yr_nondonor"]
         achieved = self._integrate_cif(target, BASE["weibull_shape"])
-        assert abs(achieved - target) / target < 0.10, \
+        assert abs(achieved - target) / target < 0.001, \
             f"Non-donor calibration off: target={target:.4%}, achieved={achieved:.4%}"
 
-    def test_accelerating_hazard(self):
-        """Weibull with k>1 should give higher hazard at t=10 than t=1."""
+    def test_accelerating_probability(self):
+        """Weibull with k>1 should give higher annual probability at t=10 than t=1."""
         k = BASE["weibull_shape"]
         lam = weibull_scale_from_cumrisk(BASE["esrd_15yr_donor_overall"], k)
-        h1  = weibull_annual_hazard(1, lam, k)
-        h10 = weibull_annual_hazard(10, lam, k)
-        assert h10 > h1, f"Hazard should increase over time (k={k}>1)"
+        p1  = weibull_annual_prob(1, lam, k)
+        p10 = weibull_annual_prob(10, lam, k)
+        assert p10 > p1, f"Annual probability should increase over time (k={k}>1)"
 
-    def test_zero_at_t0(self):
+    def test_zero_before_donation(self):
         k = BASE["weibull_shape"]
         lam = weibull_scale_from_cumrisk(BASE["esrd_15yr_donor_overall"], k)
-        assert weibull_annual_hazard(0, lam, k) == 0.0, "Hazard must be 0 at t=0"
+        assert weibull_annual_prob(-1, lam, k) == 0.0, "Probability must be 0 before donation"
 
     def test_donor_higher_than_nondonor(self):
-        """Donor hazard should be ~8× non-donor at any given time point."""
+        """Donor annual probability should be ~8× non-donor at any given time point."""
         k = BASE["weibull_shape"]
-        for target, label in [
-            (BASE["esrd_15yr_donor_overall"], "donor"),
-            (BASE["esrd_15yr_nondonor"], "nondonor"),
-        ]:
-            lam = weibull_scale_from_cumrisk(target, k)
-            _ = weibull_annual_hazard(5, lam, k)  # just check no error
-
         lam_d  = weibull_scale_from_cumrisk(BASE["esrd_15yr_donor_overall"], k)
         lam_nd = weibull_scale_from_cumrisk(BASE["esrd_15yr_nondonor"], k)
-        h_d  = weibull_annual_hazard(5, lam_d, k)
-        h_nd = weibull_annual_hazard(5, lam_nd, k)
-        rr = h_d / h_nd
-        assert 6 < rr < 11, f"Donor:nondonor hazard ratio at t=5 should be ~8×, got {rr:.1f}×"
+        p_d  = weibull_annual_prob(5, lam_d, k)
+        p_nd = weibull_annual_prob(5, lam_nd, k)
+        rr = p_d / p_nd
+        assert 6 < rr < 11, f"Donor:nondonor probability ratio at t=5 should be ~8×, got {rr:.1f}×"
 
 
 # ────────────────────────────────────────────────────────────────────────────

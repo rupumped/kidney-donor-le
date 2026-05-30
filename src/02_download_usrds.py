@@ -47,19 +47,20 @@ import warnings
 import pandas as pd
 from pathlib import Path
 
+# Allow running from repo root or src/
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import DATA_RAW, DATA_PROC
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-# ── Published fallback values ─────────────────────────────────────────────────
+# ── PUBLISHED FALLBACK VALUES ─────────────────────────────────────────────────
 # Source: USRDS 2025 ADR, CKD Volume Chapter 1
 # Survey period: 2017–March 2020 (NHANES); adults aged ≥20 with serum Cr + ACR
 # Note: based on single eGFR/ACR measurement — likely overestimates true CKD
 # prevalence relative to the KDIGO guideline requirement of ≥3 months.
 
-# ── Table 1.1b: KDIGO risk category trends (% of U.S. adults) ─────────────────
+# ── TABLE 1.1B: KDIGO RISK CATEGORY TRENDS (% OF U.S. ADULTS) ──────────────────
 KDIGO_RISK_TRENDS = {
     # period: {risk_category: pct}
     "2005-2008": {
@@ -88,7 +89,7 @@ KDIGO_RISK_TRENDS = {
     },
 }
 
-# ── Table 1.1a: eGFR × ACR grid — % and N (2017–March 2020) ─────────────────
+# ── TABLE 1.1A: EGFR × ACR GRID — % AND N (2017–MARCH 2020) ─────────────────
 # Rows: G1 eGFR≥90, G2 60-89, G3a 45-59, G3b 30-44, G4 15-29, G5 <15
 # Cols: A1 ACR<30, A2 ACR 30-299, A3 ACR≥300
 KDIGO_GRID_PCT = {
@@ -113,7 +114,7 @@ KDIGO_GRID_PCT = {
     ("G5_lt15",   "A3_ge300"):  0.13,
 }
 
-# ── Table 1.2: CKD % by socioeconomic characteristics (2017–March 2020) ──────
+# ── TABLE 1.2: CKD % BY SOCIOECONOMIC CHARACTERISTICS (2017–MARCH 2020) ──────
 CKD_BY_SES = {
     "overall":                      14.0,
     # insurance
@@ -134,7 +135,7 @@ CKD_BY_SES = {
     "at_least_some_college":        12.0,
 }
 
-# ── Demographic CKD prevalence (Figure 1.1, 2017–March 2020) ─────────────────
+# ── DEMOGRAPHIC CKD PREVALENCE (FIGURE 1.1, 2017–MARCH 2020) ─────────────────
 CKD_BY_DEMO = {
     "overall":          14.0,
     "female":           15.4,
@@ -146,7 +147,7 @@ CKD_BY_DEMO = {
     # White not explicitly stated; overall is ~14% with Black highest, Hispanic lowest
 }
 
-# ── Table 1.3: Selected health risk behaviors (adjusted, 2017–March 2020) ────
+# ── TABLE 1.3: SELECTED HEALTH RISK BEHAVIORS (ADJUSTED, 2017–MARCH 2020) ────
 RISK_BEHAVIORS = {
     "sedentary_no_ckd_pct":          20.8,   # <2.5 MET-hr/wk
     "sedentary_ckd_pct":             26.2,
@@ -158,7 +159,7 @@ RISK_BEHAVIORS = {
     "potassium_lt4700mg_ckd_pct":    97.9,
 }
 
-# ── Diabetes co-prevalence (Figure 1.6, 2017–March 2020) ─────────────────────
+# ── DIABETES CO-PREVALENCE (FIGURE 1.6, 2017–MARCH 2020) ─────────────────────
 DIABETES_BY_CKD = {
     "no_ckd_pct":   9.5,
     "any_ckd_pct": 35.6,

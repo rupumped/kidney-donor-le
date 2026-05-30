@@ -1,0 +1,9 @@
+metric,value
+sedentary_no_ckd_pct,20.8
+sedentary_ckd_pct,26.2
+current_smoker_no_ckd_pct,16.4
+current_smoker_ckd_pct,17.1
+sodium_ge2300mg_no_ckd_pct,77.8
+sodium_ge2300mg_ckd_pct,71.6
+potassium_lt4700mg_no_ckd_pct,95.6
+potassium_lt4700mg_ckd_pct,97.9

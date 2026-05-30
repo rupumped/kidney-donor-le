@@ -1,0 +1,18 @@
+{
+  "ckd_prevalence_overall": 0.14,
+  "ckd_prevalence_female": 0.154,
+  "ckd_prevalence_male": 0.126,
+  "ckd_prevalence_lt65": 0.09,
+  "ckd_prevalence_ge65": 0.332,
+  "ckd_prevalence_black": 0.188,
+  "ckd_prevalence_hispanic": 0.12,
+  "kdigo_moderately_high_risk_pct": 10.5,
+  "kdigo_high_risk_pct": 2.4,
+  "kdigo_very_high_risk_pct": 1.1,
+  "diabetes_prev_no_ckd": 0.095,
+  "diabetes_prev_any_ckd": 0.35600000000000004,
+  "sedentary_no_ckd": 0.20800000000000002,
+  "sedentary_ckd": 0.262,
+  "nhanes_period": "2017-March 2020",
+  "adr_year": 2025
+}

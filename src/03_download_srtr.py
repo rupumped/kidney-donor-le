@@ -1,36 +1,27 @@
 """
 03_download_srtr.py
 ───────────────────
-Extracts waitlist mortality, wait times, and post-transplant survival
-parameters from the SRTR 2022 Annual Data Report (Kidney chapter).
+Extracts waitlist mortality, wait times, and post-transplant survival parameters
+from the SRTR 2023 Annual Data Report supporting data for the Kidney chapter.
 
-─── ACCESS NOTE ──────────────────────────────────────────────────────────────
-SRTR ADR data is publicly available at:
-  https://srtr.transplant.hrsa.gov/annual_reports/Default.aspx
+─── SOURCE ────────────────────────────────────────────────────────────────────
+SRTR 2023 ADR supporting figures:
+  File: data/raw/Kidney_Figures_Supporting_Information.xlsx
+  Obtained from: https://srtr.transplant.hrsa.gov/annual_reports/Default.aspx
 
-The 2022 ADR was published February 2024 in the American Journal of
-Transplantation (AJT) as a supplement:
-  AJT 2024;24(2 Suppl):S1–S572
+Transplant cohort for survival figures: 2016–2018 recipients.
 
-Key figures used (all from the Kidney chapter):
-  Figure KI 24  — pretransplant mortality: 5.4 deaths/100 PY (2022)
-  Figure KI 25  — pretransplant mortality by age (for age stratification)
-  Figure KI 22  — 3-year outcomes for 2017–2019 cohort (removal rates)
-  Table KI 11   — DDKT graft survival by age
-  Table KI 12   — LDKT graft survival by age
-  Table KI 13   — Patient survival post-transplant
-
-Interactive data queries are also available at:
-  https://srtr.transplant.hrsa.gov/
-
-─── MANUAL DOWNLOAD STEPS ────────────────────────────────────────────────────
-1. Go to https://srtr.transplant.hrsa.gov/annual_reports/Default.aspx
-2. Select 2022 Annual Data Report → Kidney chapter
-3. Download tables KI 11, KI 12, KI 13 as Excel files
-4. Place in data/raw/:
-     srtr_2022_ki_table11_ddkt_graft.xlsx
-     srtr_2022_ki_table12_ldkt_graft.xlsx
-     srtr_2022_ki_table13_patient_survival.xlsx
+Key figures used (Kidney chapter):
+  Figure KI 22  — 3-year waitlist outcomes (2019–2021 listing cohort)
+  Figure KI 24  — pretransplant mortality rate overall by year
+  Figure KI 25  — pretransplant mortality rate by age
+  Figure KI 26  — pretransplant mortality rate by race
+  Figure KI 30  — pretransplant mortality rate by DSA (2023)
+  Figure KI 53  — DDKT graft survival by recipient age (KM, 2016–2018 cohort)
+  Figure KI 61  — LDKT graft survival by recipient age (KM, 2016–2018 cohort)
+  Figure KI 70  — DD patient survival by recipient age (KM, 2016–2018 cohort)
+  Figure KI 71  — DD patient survival by race (KM, 2016–2018 cohort)
+  Figure KI 76  — LD patient survival by recipient age (KM, 2016–2018 cohort)
 
 Outputs:
   data/processed/srtr_graft_survival.csv
@@ -45,193 +36,367 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
+# Allow running from repo root or src/
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import DATA_RAW, DATA_PROC
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
+SRTR_EXCEL = DATA_RAW / "Kidney_Figures_Supporting_Information.xlsx"
 
-# ── Confirmed SRTR parameter values ──────────────────────────────────────────
-# Confirmed directly from SRTR 2022 ADR (AJT 2024;24 Suppl) and cross-checked
-# against SRTR interactive query tool.
+# ── CONFIRMED SRTR 2023 ADR FALLBACK VALUES ───────────────────────────────────
+# Parsed directly from Kidney_Figures_Supporting_Information.xlsx.
+# Transplant cohort for survival figures: 2016–2018 recipients.
 
 SRTR_FALLBACK = {
 
-    # ── Waitlist mortality ────────────────────────────────────────────────
-    # SRTR 2022 ADR Figure KI 24
-    "pretx_mort_per_100py_overall_2022": 5.4,
-    # Range by DSA: 1.8–7.5/100 PY (Figure KI 30)
-    "pretx_mort_per_100py_dsa_min": 1.8,
-    "pretx_mort_per_100py_dsa_max": 7.5,
-    # Approximate by race (from Figure KI 25 — read from published figure)
-    "pretx_mort_per_100py_black":   6.5,
-    "pretx_mort_per_100py_white":   5.0,
-    "pretx_mort_per_100py_hispanic": 4.8,
-    # Long waiters (5+ years): 19.2/100 PY (Figure KI 20)
-    "pretx_mort_per_100py_longwaiter": 19.2,
+    # ── WAITLIST MORTALITY ────────────────────────────────────────────────
+    # SRTR 2023 ADR Figure KI 24 (2023 data year)
+    "pretx_mort_per_100py_overall_2023": 5.0,
+    # DSA range (Figure KI 30, 2023): 2.01–7.30/100 PY
+    "pretx_mort_per_100py_dsa_min": 2.01,
+    "pretx_mort_per_100py_dsa_max": 7.30,
+    # By age (Figure KI 25, 2023)
+    "pretx_mort_per_100py_age1834": 2.04,
+    "pretx_mort_per_100py_age3549": 3.01,
+    "pretx_mort_per_100py_age5064": 5.20,
+    "pretx_mort_per_100py_age65p":  7.48,
+    # By race (Figure KI 26, 2023)
+    "pretx_mort_per_100py_black":    4.62,
+    "pretx_mort_per_100py_white":    5.71,
+    "pretx_mort_per_100py_hispanic": 4.59,
 
-    # ── Waitlist composition (Figure KI 22) ──────────────────────────────
-    # 3-year outcomes for cohort listed 2017–2019
-    "wl_3yr_still_waiting":  0.314,  # 31.4%
-    "wl_3yr_ddkt":           0.289,  # 28.9%
-    "wl_3yr_ldkt":           0.140,  # 14.0%
-    "wl_3yr_died":           0.065,  # 6.5%
-    "wl_3yr_removed_other":  0.192,  # 19.2% (too sick / other)
-    # Annual competing removal rate derived from 3-yr figure:
-    # 1 - (1 - 0.192)^(1/3) ≈ 6.8%/yr, rounded to 6.4% in base case
-    "wl_annual_removal_competing": 0.064,
+    # ── WAITLIST 3-YEAR OUTCOMES (FIGURE KI 22, 2019–2021 LISTING COHORT) ─
+    "wl_3yr_still_waiting":  0.299,
+    "wl_3yr_ddkt":           0.308,
+    "wl_3yr_ldkt":           0.135,
+    "wl_3yr_died":           0.068,
+    "wl_3yr_removed_other":  0.191,
+    # Annual competing removal derived: 1 - (1 - 0.191)^(1/3) ≈ 6.8%/yr
+    "wl_annual_removal_competing": 0.068,
 
-    # ── Median wait times ─────────────────────────────────────────────────
+    # ── MEDIAN WAIT TIMES ─────────────────────────────────────────────────
     # Post-KAS250 (March 2021) national median: ~32.8 months
     # Source: ScienceDirect 2024 / Schold AJT 2023
-    "wl_std_median_days": 985,   # ~32.8 months × 30 = 984 days
-    "wl_std_median_days_prekas250": 1760,  # ~57.8 months pre-KAS250
+    "wl_std_median_days": 985,
+    "wl_std_median_days_prekas250": 1760,
     # Prior living donors (PLD) — Wainright 2017 AJT, UNOS abstract 2015
     "wl_pld_median_days_overall": 100,
-    "wl_pld_median_days_from_activation": 23,  # CJASN 2016 study (n=210 PLDs)
+    "wl_pld_median_days_from_activation": 23,
     # By blood type (Schold AJT 2023)
-    "wl_median_days_ab": int(4.48 * 365.25),   # 4.48 active years
-    "wl_median_days_overall_km": int(4.05 * 365.25),
+    "wl_median_days_ab":          int(4.48 * 365.25),
+    "wl_median_days_overall_km":  int(4.05 * 365.25),
 
-    # ── DDKT graft survival by recipient age (SRTR 2022, Table KI 11) ────
-    # Unadjusted Kaplan-Meier, 2015–2017 transplant cohort
-    "ddkt_graft_5yr_age1834": 0.814,
-    "ddkt_graft_5yr_age3549": 0.769,
-    "ddkt_graft_5yr_age5064": 0.750,
-    "ddkt_graft_5yr_age65p":  0.678,
-    # Derived mid-range for 35–64 group:
-    "ddkt_graft_5yr_age3564": 0.760,
+    # ── DDKT GRAFT SURVIVAL BY RECIPIENT AGE (FIGURE KI 53, 5-YEAR KM) ───
+    # Unadjusted Kaplan-Meier, 2016–2018 transplant cohort
+    "ddkt_graft_5yr_age1834": 0.822,
+    "ddkt_graft_5yr_age3549": 0.835,
+    "ddkt_graft_5yr_age5064": 0.768,
+    "ddkt_graft_5yr_age65p":  0.661,
+    # Convenience mid-range for combined 35–64 group
+    "ddkt_graft_5yr_age3564": 0.802,
 
-    # ── LDKT graft survival by recipient age (SRTR 2022, Table KI 12) ────
-    "ldkt_graft_5yr_age1834": 0.900,
-    "ldkt_graft_5yr_age3564": 0.848,
-    "ldkt_graft_5yr_age65p":  0.808,
+    # ── LDKT GRAFT SURVIVAL BY RECIPIENT AGE (FIGURE KI 61, 5-YEAR KM) ───
+    "ldkt_graft_5yr_age1834": 0.901,
+    "ldkt_graft_5yr_age3549": 0.917,
+    "ldkt_graft_5yr_age5064": 0.893,
+    "ldkt_graft_5yr_age65p":  0.802,
+    "ldkt_graft_5yr_age3564": 0.905,
 
-    # ── Patient (not graft) survival post-DDKT (approximate from ADR) ────
-    # 3-year patient survival ≈ 85% (SRTR)
-    # Annual mortality derived: 1 - 0.85^(1/3) ≈ 5.2%/yr
-    "posttx_3yr_patient_surv": 0.85,
-    "posttx_annual_mort_overall": 0.052,
+    # ── PATIENT SURVIVAL POST-DDKT BY AGE (FIGURE KI 70, 5-YEAR KM) ──────
+    "posttx_dd_5yr_patient_surv_age1834": 0.957,
+    "posttx_dd_5yr_patient_surv_age3549": 0.914,
+    "posttx_dd_5yr_patient_surv_age5064": 0.820,
+    "posttx_dd_5yr_patient_surv_age65p":  0.701,
+    # Annual mortality derived: 1 - surv^(1/5)
+    "posttx_dd_annual_mort_age1834": 0.009,
+    "posttx_dd_annual_mort_age3549": 0.018,
+    "posttx_dd_annual_mort_age5064": 0.039,
+    "posttx_dd_annual_mort_age65p":  0.068,
 
-    # Race-stratified post-transplant patient mortality (approximate,
-    # from SRTR 5-yr patient survival by race — Black ~72%, White ~79%)
-    "posttx_5yr_patient_surv_black": 0.72,
-    "posttx_5yr_patient_surv_white": 0.79,
-    "posttx_annual_mort_black": 0.065,  # 1 - 0.72^(1/5)
-    "posttx_annual_mort_white": 0.048,  # 1 - 0.79^(1/5)
+    # ── PATIENT SURVIVAL POST-DDKT BY RACE (FIGURE KI 71, 5-YEAR KM) ─────
+    "posttx_dd_5yr_patient_surv_black": 0.837,
+    "posttx_dd_5yr_patient_surv_white": 0.825,
+    "posttx_dd_annual_mort_black": 0.036,
+    "posttx_dd_annual_mort_white": 0.038,
 
-    # Annual graft failure rate post-year-1 (approximate)
+    # ── PATIENT SURVIVAL POST-LDKT BY AGE (FIGURE KI 76, 5-YEAR KM) ──────
+    "posttx_ld_5yr_patient_surv_age1834": 0.979,
+    "posttx_ld_5yr_patient_surv_age3549": 0.961,
+    "posttx_ld_5yr_patient_surv_age5064": 0.917,
+    "posttx_ld_5yr_patient_surv_age65p":  0.819,
+
+    # Annual graft failure rate post-year-1 (approximate, unchanged)
     "graft_annual_fail_postyear1": 0.025,
-
-    # Long-term median graft survival (AJT 2021, SRTR data 1995-2017)
+    # Long-term median graft survival (AJT 2021, SRTR data 1995–2017)
     "ddkt_median_graft_surv_yr_2014era": 11.7,
 }
 
 
-def try_parse_srtr_table(path: Path) -> pd.DataFrame:
-    if not path.exists():
-        return None
-    try:
-        df = pd.read_excel(path, header=None)
-        return df
-    except Exception as e:
-        print(f"  Warning: could not parse {path.name}: {e}")
-        return None
+# ── PARSING HELPERS ───────────────────────────────────────────────────────────
+
+def _find_km_header(df):
+    """Return (hdr_row_idx, yr_col_idx) for a KM figure sheet."""
+    for i, row in df.iterrows():
+        for j, v in enumerate(row):
+            if str(v) == "Years after transplant" or str(v) == "Years after listing":
+                return i, j
+    return None, None
 
 
-def parse_graft_survival_table(raw_df: pd.DataFrame, donor_type: str) -> pd.DataFrame:
+def km_at_year(xl, sheet, target_year):
     """
-    Parse a SRTR graft survival table.
-    Expected structure: age group rows × time point columns (1yr, 3yr, 5yr, 10yr).
+    Extract all column values from a KM figure sheet at the time point
+    closest to target_year. Returns {col_name: float_percent} dict.
     """
+    df = xl.parse(sheet, header=None)
+    hdr_row, yr_col = _find_km_header(df)
+    if hdr_row is None:
+        return {}
+
+    cols = df.iloc[hdr_row].tolist()
+    data = df.iloc[hdr_row + 1:].copy()
+    data.iloc[:, yr_col] = pd.to_numeric(data.iloc[:, yr_col], errors="coerce")
+    data = data.dropna(subset=[data.columns[yr_col]])
+
+    idx = (data.iloc[:, yr_col] - target_year).abs().idxmin()
+    row = data.loc[idx]
+
+    result = {}
+    for ci, col in enumerate(cols):
+        label = str(col)
+        if label in ("nan", "Years after transplant", "Years after listing"):
+            continue
+        v = pd.to_numeric(row.iloc[ci], errors="coerce")
+        if not pd.isna(v):
+            result[label] = round(v, 4)
+    return result
+
+
+def km_to_rows(xl, sheet, donor_type, timepoints=(1, 3, 5)):
+    """Build a list of {age_group, timepoint, survival, donor_type} dicts."""
     rows = []
-    age_groups = ["18-34", "35-49", "50-64", "65+"]
+    for tp in timepoints:
+        vals = km_at_year(xl, sheet, tp)
+        for col, pct in vals.items():
+            rows.append({
+                "age_group": col,
+                "timepoint": f"{tp}yr",
+                "survival": round(pct / 100, 5),
+                "donor_type": donor_type,
+            })
+    return rows
 
-    for i, row in raw_df.iterrows():
-        first = str(row.iloc[0]).strip()
-        for ag in age_groups:
-            if ag.replace("-", "–") in first or ag in first:
-                numerics = [pd.to_numeric(v, errors="coerce") for v in row.values[1:]]
-                numerics = [v for v in numerics if pd.notna(v)]
-                timepoints = ["1yr", "3yr", "5yr", "10yr"][:len(numerics)]
-                for tp, val in zip(timepoints, numerics):
-                    rows.append({"age_group": ag, "timepoint": tp,
-                                 "survival": val, "donor_type": donor_type})
-                break
 
-    if not rows:
-        return None
-    return pd.DataFrame(rows)
+def parse_time_series_last(xl, sheet, col_name):
+    """Return the last (most recent) value in a year × metric time-series sheet."""
+    df = xl.parse(sheet, header=None)
+    # Header row has 'Year' in column 0
+    hdr_row = None
+    for i, row in df.iterrows():
+        if str(row.iloc[0]).strip() == "Year":
+            hdr_row = i
+            break
+    if hdr_row is None:
+        return {}
+    cols = df.iloc[hdr_row].tolist()
+    data = df.iloc[hdr_row + 1:].copy()
+    data.iloc[:, 0] = pd.to_numeric(data.iloc[:, 0], errors="coerce")
+    data = data.dropna(subset=[data.columns[0]]).sort_values(data.columns[0])
+    last_row = data.iloc[-1]
+    result = {}
+    for ci, col in enumerate(cols):
+        label = str(col)
+        if label in ("nan", "Year"):
+            continue
+        if col_name and label != col_name:
+            continue
+        v = pd.to_numeric(last_row.iloc[ci], errors="coerce")
+        if not pd.isna(v):
+            result[label] = round(v, 4)
+    return result
 
+
+# ── MAIN ──────────────────────────────────────────────────────────────────────
 
 def main():
     print("=== 03_download_srtr.py ===\n")
-    print("Checking for SRTR Excel files in data/raw/ ...\n")
 
-    found_any = False
-    graft_dfs = []
+    params = dict(SRTR_FALLBACK)
+    graft_rows = []
+    patient_rows = []
 
-    for fname, donor_type in [
-        ("srtr_2022_ki_table11_ddkt_graft.xlsx", "DDKT"),
-        ("srtr_2022_ki_table12_ldkt_graft.xlsx", "LDKT"),
-    ]:
-        path = DATA_RAW / fname
-        raw = try_parse_srtr_table(path)
-        if raw is not None:
-            print(f"  Found {fname} — attempting extraction...")
-            gdf = parse_graft_survival_table(raw, donor_type)
-            if gdf is not None:
-                graft_dfs.append(gdf)
-                found_any = True
-                print(f"  Extracted {len(gdf)} graft survival rows")
-            else:
-                print(f"  Could not parse table structure — using fallback")
+    if not SRTR_EXCEL.exists():
+        print(f"  {SRTR_EXCEL.name} not found in data/raw/ — using hardcoded fallback values.\n")
+    else:
+        print(f"  Parsing {SRTR_EXCEL.name} ...\n")
+        xl = pd.ExcelFile(SRTR_EXCEL)
 
-    if graft_dfs:
-        combined = pd.concat(graft_dfs, ignore_index=True)
+        # ── Pretransplant mortality ───────────────────────────────────────
+        mort_overall = parse_time_series_last(xl, "KI-F24-mort-adult-waiting-all", "overall")
+        if mort_overall:
+            params["pretx_mort_per_100py_overall_2023"] = round(mort_overall["overall"], 2)
+
+        mort_age = parse_time_series_last(xl, "KI-F25-mort-adult-waiting-age", None)
+        age_map = {
+            "18-34 years": "pretx_mort_per_100py_age1834",
+            "35-49":        "pretx_mort_per_100py_age3549",
+            "50-64":        "pretx_mort_per_100py_age5064",
+            "65+":          "pretx_mort_per_100py_age65p",
+        }
+        for col, key in age_map.items():
+            if col in mort_age:
+                params[key] = round(mort_age[col], 2)
+
+        mort_race = parse_time_series_last(xl, "KI-F26-mort-adult-waiting-race", None)
+        race_map = {
+            "Black":    "pretx_mort_per_100py_black",
+            "White":    "pretx_mort_per_100py_white",
+            "Hispanic": "pretx_mort_per_100py_hispanic",
+        }
+        for col, key in race_map.items():
+            if col in mort_race:
+                params[key] = round(mort_race[col], 2)
+
+        # ── 3-year waitlist outcomes ──────────────────────────────────────
+        wl3 = km_at_year(xl, "KI-F22-3yr-outcomes-adult-waiti", 3)
+        outcome_map = {
+            "Still on waiting list": "wl_3yr_still_waiting",
+            "DD transplant":         "wl_3yr_ddkt",
+            "LD transplant":         "wl_3yr_ldkt",
+            "Died":                  "wl_3yr_died",
+            "Removed from list":     "wl_3yr_removed_other",
+        }
+        for col, key in outcome_map.items():
+            if col in wl3:
+                params[key] = round(wl3[col] / 100, 4)
+        if "wl_3yr_removed_other" in params:
+            r = params["wl_3yr_removed_other"]
+            params["wl_annual_removal_competing"] = round(1 - (1 - r) ** (1 / 3), 4)
+
+        # ── DDKT graft survival (Figure KI 53) ───────────────────────────
+        ddkt_rows = km_to_rows(xl, "KI-F53-tx-adult-GF-DD-5yr-age", "DDKT")
+        if ddkt_rows:
+            graft_rows.extend(ddkt_rows)
+            # update scalar params for 5-year values
+            for r in ddkt_rows:
+                if r["timepoint"] == "5yr":
+                    ag = r["age_group"]
+                    surv = r["survival"]
+                    key_map = {
+                        "18-34 years": "ddkt_graft_5yr_age1834",
+                        "35-49":       "ddkt_graft_5yr_age3549",
+                        "50-64":       "ddkt_graft_5yr_age5064",
+                        "65+":         "ddkt_graft_5yr_age65p",
+                    }
+                    if ag in key_map:
+                        params[key_map[ag]] = surv
+
+        # ── LDKT graft survival (Figure KI 61) ───────────────────────────
+        ldkt_rows = km_to_rows(xl, "KI-F61-tx-adult-GF-LD-5yr-age", "LDKT")
+        if ldkt_rows:
+            graft_rows.extend(ldkt_rows)
+            for r in ldkt_rows:
+                if r["timepoint"] == "5yr":
+                    ag = r["age_group"]
+                    surv = r["survival"]
+                    key_map = {
+                        "18-34 years": "ldkt_graft_5yr_age1834",
+                        "35-49":       "ldkt_graft_5yr_age3549",
+                        "50-64":       "ldkt_graft_5yr_age5064",
+                        "65+":         "ldkt_graft_5yr_age65p",
+                    }
+                    if ag in key_map:
+                        params[key_map[ag]] = surv
+
+        # Convenience combined 35–64 graft survival
+        for prefix in ("ddkt", "ldkt"):
+            s3549 = params.get(f"{prefix}_graft_5yr_age3549")
+            s5064 = params.get(f"{prefix}_graft_5yr_age5064")
+            if s3549 and s5064:
+                params[f"{prefix}_graft_5yr_age3564"] = round((s3549 + s5064) / 2, 3)
+
+        # ── DD patient survival by age (Figure KI 70) ────────────────────
+        dd_pt_rows = km_to_rows(xl, "KI-F70-tx-adult-pat-surv-DD-5y-", "DDKT_patient")
+        if dd_pt_rows:
+            patient_rows.extend(dd_pt_rows)
+            ps_key_map = {
+                "18-34 years": ("posttx_dd_5yr_patient_surv_age1834", "posttx_dd_annual_mort_age1834"),
+                "35-49":       ("posttx_dd_5yr_patient_surv_age3549", "posttx_dd_annual_mort_age3549"),
+                "50-64":       ("posttx_dd_5yr_patient_surv_age5064", "posttx_dd_annual_mort_age5064"),
+                "65+":         ("posttx_dd_5yr_patient_surv_age65p",  "posttx_dd_annual_mort_age65p"),
+            }
+            for r in dd_pt_rows:
+                if r["timepoint"] == "5yr" and r["age_group"] in ps_key_map:
+                    surv = r["survival"]
+                    surv_key, mort_key = ps_key_map[r["age_group"]]
+                    params[surv_key] = surv
+                    params[mort_key] = round(1 - surv ** (1 / 5), 4)
+
+        # ── DD patient survival by race (Figure KI 71) ───────────────────
+        dd_race_rows = km_to_rows(xl, "KI-F71-tx-adult-pat-surv-DD-5y-", "DDKT_patient_race")
+        if dd_race_rows:
+            patient_rows.extend(dd_race_rows)
+            for r in dd_race_rows:
+                if r["timepoint"] == "5yr":
+                    ag = r["age_group"]
+                    surv = r["survival"]
+                    if ag == "Black":
+                        params["posttx_dd_5yr_patient_surv_black"] = surv
+                        params["posttx_dd_annual_mort_black"] = round(1 - surv ** (1 / 5), 4)
+                    elif ag == "White":
+                        params["posttx_dd_5yr_patient_surv_white"] = surv
+                        params["posttx_dd_annual_mort_white"] = round(1 - surv ** (1 / 5), 4)
+
+        # ── LD patient survival by age (Figure KI 76) ────────────────────
+        ld_pt_rows = km_to_rows(xl, "KI-F76-tx-adult-pat-surv-LD-5y-", "LDKT_patient")
+        if ld_pt_rows:
+            patient_rows.extend(ld_pt_rows)
+            ld_ps_key_map = {
+                "18-34 years": "posttx_ld_5yr_patient_surv_age1834",
+                "35-49":       "posttx_ld_5yr_patient_surv_age3549",
+                "50-64":       "posttx_ld_5yr_patient_surv_age5064",
+                "65+":         "posttx_ld_5yr_patient_surv_age65p",
+            }
+            for r in ld_pt_rows:
+                if r["timepoint"] == "5yr" and r["age_group"] in ld_ps_key_map:
+                    params[ld_ps_key_map[r["age_group"]]] = r["survival"]
+
+        print(f"  Parsed {len(graft_rows)} graft survival rows")
+        print(f"  Parsed {len(patient_rows)} patient survival rows")
+
+    # ── SAVE GRAFT SURVIVAL CSV ───────────────────────────────────────────
+    if graft_rows:
+        gdf = pd.DataFrame(graft_rows)
         out = DATA_PROC / "srtr_graft_survival.csv"
-        combined.to_csv(out, index=False)
+        gdf.to_csv(out, index=False)
         print(f"  Saved → {out}")
 
-    # Patient survival table
-    path_pt = DATA_RAW / "srtr_2022_ki_table13_patient_survival.xlsx"
-    raw_pt = try_parse_srtr_table(path_pt)
-    if raw_pt is not None:
-        out_pt = DATA_PROC / "srtr_patient_survival_raw.csv"
-        raw_pt.to_csv(out_pt, index=False)
-        print(f"  Saved raw patient survival → {out_pt}")
-        found_any = True
+    # ── SAVE PATIENT SURVIVAL CSV ─────────────────────────────────────────
+    if patient_rows:
+        pdf = pd.DataFrame(patient_rows)
+        out_pt = DATA_PROC / "srtr_patient_survival.csv"
+        pdf.to_csv(out_pt, index=False)
+        print(f"  Saved → {out_pt}")
 
-    # Always write scalar fallback params
+    # ── SAVE SCALAR PARAMS JSON ───────────────────────────────────────────
     params_out = DATA_PROC / "srtr_params.json"
     with open(params_out, "w") as f:
-        json.dump(SRTR_FALLBACK, f, indent=2)
+        json.dump(params, f, indent=2)
     print(f"\n  Saved scalar parameters → {params_out}")
 
-    if not found_any:
-        print("\n  No SRTR Excel files found in data/raw/")
-        print("  Using confirmed fallback values from SRTR 2022 ADR (AJT 2024 Suppl).")
-        print()
-        print("  To use actual downloaded data:")
-        print("    1. Go to https://srtr.transplant.hrsa.gov/annual_reports/")
-        print("    2. Select 2022 Annual Data Report → Kidney chapter")
-        print("    3. Download Tables KI 11, KI 12, KI 13 as Excel")
-        print("    4. Save to data/raw/ with names:")
-        print("         srtr_2022_ki_table11_ddkt_graft.xlsx")
-        print("         srtr_2022_ki_table12_ldkt_graft.xlsx")
-        print("         srtr_2022_ki_table13_patient_survival.xlsx")
-        print("    5. Re-run this script")
-
-    # Print key values for verification
+    # ── KEY VALUES SUMMARY ────────────────────────────────────────────────
+    p = params
     print("\n  Key values written to srtr_params.json:")
-    p = SRTR_FALLBACK
-    print(f"    Pretx mortality (2022):         {p['pretx_mort_per_100py_overall_2022']:.1f}/100 PY")
-    print(f"    Std wait median (post-KAS250):  {p['wl_std_median_days']} days")
-    print(f"    PLD wait median (post-KAS):     {p['wl_pld_median_days_overall']} days")
-    print(f"    DDKT 5-yr graft surv (18-34):   {p['ddkt_graft_5yr_age1834']:.1%}")
-    print(f"    DDKT 5-yr graft surv (65+):     {p['ddkt_graft_5yr_age65p']:.1%}")
-    print(f"    Post-tx 3-yr patient surv:      {p['posttx_3yr_patient_surv']:.0%}")
-    print(f"    Post-tx annual mort (overall):  {p['posttx_annual_mort_overall']:.1%}")
+    print(f"    Pretx mortality (2023):          {p['pretx_mort_per_100py_overall_2023']:.1f}/100 PY")
+    print(f"    Std wait median (post-KAS250):   {p['wl_std_median_days']} days")
+    print(f"    PLD wait median:                 {p['wl_pld_median_days_overall']} days")
+    print(f"    DDKT 5-yr graft surv (18–34):    {p['ddkt_graft_5yr_age1834']:.1%}")
+    print(f"    DDKT 5-yr graft surv (35–49):    {p['ddkt_graft_5yr_age3549']:.1%}")
+    print(f"    DDKT 5-yr graft surv (50–64):    {p['ddkt_graft_5yr_age5064']:.1%}")
+    print(f"    DDKT 5-yr graft surv (65+):      {p['ddkt_graft_5yr_age65p']:.1%}")
+    print(f"    DD 5-yr patient surv (50–64):    {p['posttx_dd_5yr_patient_surv_age5064']:.1%}")
+    print(f"    DD 5-yr patient surv (65+):      {p['posttx_dd_5yr_patient_surv_age65p']:.1%}")
     print("\nDone.")
 
 

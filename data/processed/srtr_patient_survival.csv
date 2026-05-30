@@ -1,0 +1,43 @@
+age_group,timepoint,survival,donor_type
+18-34 years,1yr,0.99044,DDKT_patient
+35-49,1yr,0.98358,DDKT_patient
+50-64,1yr,0.96313,DDKT_patient
+65+,1yr,0.93877,DDKT_patient
+18-34 years,3yr,0.97711,DDKT_patient
+35-49,3yr,0.95891,DDKT_patient
+50-64,3yr,0.90927,DDKT_patient
+65+,3yr,0.84503,DDKT_patient
+18-34 years,5yr,0.9566,DDKT_patient
+35-49,5yr,0.91374,DDKT_patient
+50-64,5yr,0.82029,DDKT_patient
+65+,5yr,0.70132,DDKT_patient
+Asian,1yr,0.9732,DDKT_patient_race
+Black,1yr,0.96829,DDKT_patient_race
+Hispanic,1yr,0.97332,DDKT_patient_race
+Multiracial,1yr,0.97067,DDKT_patient_race
+Native American,1yr,0.95806,DDKT_patient_race
+White,1yr,0.96173,DDKT_patient_race
+Asian,3yr,0.93623,DDKT_patient_race
+Black,3yr,0.91832,DDKT_patient_race
+Hispanic,3yr,0.93213,DDKT_patient_race
+Multiracial,3yr,0.93548,DDKT_patient_race
+Native American,3yr,0.883,DDKT_patient_race
+White,3yr,0.90725,DDKT_patient_race
+Asian,5yr,0.88108,DDKT_patient_race
+Black,5yr,0.83684,DDKT_patient_race
+Hispanic,5yr,0.85135,DDKT_patient_race
+Multiracial,5yr,0.87683,DDKT_patient_race
+Native American,5yr,0.74393,DDKT_patient_race
+White,5yr,0.82494,DDKT_patient_race
+18-34 years,1yr,0.99726,LDKT_patient
+35-49,1yr,0.99401,LDKT_patient
+50-64,1yr,0.98885,LDKT_patient
+65+,1yr,0.98105,LDKT_patient
+18-34 years,3yr,0.99042,LDKT_patient
+35-49,3yr,0.9816,LDKT_patient
+50-64,3yr,0.96346,LDKT_patient
+65+,3yr,0.92695,LDKT_patient
+18-34 years,5yr,0.97914,LDKT_patient
+35-49,5yr,0.96093,LDKT_patient
+50-64,5yr,0.9167,LDKT_patient
+65+,5yr,0.81944,LDKT_patient
