@@ -19,7 +19,9 @@
   "wl_pld_median_days": 102.6,
   "wl_std_median_days_prekas250": 1760,
   "wl_pld_median_days_from_activation": 23.0,
-  "wl_listing_prob": 0.75,
+  "wl_listing_prob": 0.15,
+  "wl_listing_prob_sens_low": 0.05,
+  "wl_listing_prob_sens_high": 0.3,
   "posttx_annual_mort_age1834": 0.0088,
   "posttx_annual_mort_age3549": 0.0179,
   "posttx_annual_mort_age5064": 0.0388,
@@ -43,6 +45,7 @@
     "weibull_shape": "Calibrated to Massie 2017 20-yr cumulative incidence",
     "dialysis_survival": "USRDS 2023/2024 ADR (hardcoded from published tables)",
     "waitlist_outcomes": "SRTR 2023 ADR",
+    "wl_listing_prob": "USRDS 2025 ADR ESRD Vol. Ch.7 Figs 7.13/7.15/7.17",
     "pld_wait_time": "Wainright 2017 AJT 17:1103; UNOS ATC abstract 2015",
     "posttx_survival": "SRTR 2023 ADR DDKT patient survival (age-stratified)",
     "donor_mort_hr_base": "Muzaale 2014; Segev 2010 JAMA 303:959; Grams 2018 meta-analysis (PubMed 29379948)",
@@ -55,6 +58,6 @@
     "Donor all-cause mortality HR=1.0 base case per US evidence; 1.30 as sensitivity (Mj\u00f8en)",
     "Weibull k=1.5 supported by Massie 2017 20-yr data showing accelerating hazard",
     "Post-tx mortality age-stratified from SRTR 2023 DDKT 5-yr patient survival",
-    "wl_listing_prob=0.75 is an approximation; calibration to USRDS listing data pending"
+    "wl_listing_prob=0.15: back-calculated from USRDS 2025 Fig 7.15 3-yr CIF=12% (general ESRD p\u22480.065/yr), scaled for donor-like 18-44 cohort via Figs 7.13+7.17 (post-dialysis yr1 listing \u22489.2%, conditional p\u22480.17/yr); conservative base 0.15; sensitivity 0.05-0.30. Replaces prior placeholder 0.75."
   ]
 }

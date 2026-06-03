@@ -11,6 +11,7 @@ Key reconciliation decisions:
   3. Donor all-cause mortality HR: base case 1.0 (Muzaale/US), sensitivity 1.30 (Mjøen)
   4. ESRD Weibull shape k=1.5 (supported by Massie 2017 20-yr data)
   5. Race-specific waitlist/post-tx parameters from SRTR 2023 ADR
+  6. wl_listing_prob=0.15 calibrated from USRDS 2025 ADR ESRD Ch.7 Figs 7.13/7.15/7.17
 
 Output:
   data/processed/params.json
@@ -36,9 +37,10 @@ def main():
     print("=== 05_assemble_parameters.py ===\n")
 
     # Load component files
-    lit    = load_json(DATA_PROC / "literature_params.json")
-    usrds  = load_json(DATA_PROC / "usrds_params.json")
-    srtr   = load_json(DATA_PROC / "srtr_params.json")
+    lit      = load_json(DATA_PROC / "literature_params.json")
+    usrds    = load_json(DATA_PROC / "usrds_params.json")
+    usrds_e7 = load_json(DATA_PROC / "usrds_esrd7_params.json")
+    srtr     = load_json(DATA_PROC / "srtr_params.json")
 
     muz = lit.get("muzaale2014", {})
     gr  = lit.get("grams2016", {})
@@ -102,8 +104,11 @@ def main():
     params["wl_std_median_days_prekas250"] = srtr.get("wl_std_median_days_prekas250", 1760)
     params["wl_pld_median_days_from_activation"] = w.get("pld_mwt_from_activation", 23.0)
 
-    # Fraction of dialysis survivors listed each cycle (approximate)
-    params["wl_listing_prob"] = 0.75
+    # Conditional per-cycle listing probability, calibrated from
+    # USRDS 2025 ADR ESRD Ch.7 Figs 7.13/7.15/7.17 (RECONCILIATION DECISION 6)
+    params["wl_listing_prob"] = usrds_e7.get("wl_listing_prob", 0.15)
+    params["wl_listing_prob_sens_low"]  = usrds_e7.get("wl_listing_prob_sens_low",  0.05)
+    params["wl_listing_prob_sens_high"] = usrds_e7.get("wl_listing_prob_sens_high", 0.30)
 
     # ── POST-TRANSPLANT OUTCOMES ──────────────────────────────────────────
     # Age-stratified annual mortality from SRTR 2023 DDKT patient survival
@@ -155,6 +160,7 @@ def main():
         "weibull_shape":          "Calibrated to Massie 2017 20-yr cumulative incidence",
         "dialysis_survival":      "USRDS 2023/2024 ADR (hardcoded from published tables)",
         "waitlist_outcomes":      "SRTR 2023 ADR",
+        "wl_listing_prob":        "USRDS 2025 ADR ESRD Vol. Ch.7 Figs 7.13/7.15/7.17",
         "pld_wait_time":          "Wainright 2017 AJT 17:1103; UNOS ATC abstract 2015",
         "posttx_survival":        "SRTR 2023 ADR DDKT patient survival (age-stratified)",
         "donor_mort_hr_base":     "Muzaale 2014; Segev 2010 JAMA 303:959; "
@@ -170,7 +176,10 @@ def main():
         "1.30 as sensitivity (Mjøen)",
         "Weibull k=1.5 supported by Massie 2017 20-yr data showing accelerating hazard",
         "Post-tx mortality age-stratified from SRTR 2023 DDKT 5-yr patient survival",
-        "wl_listing_prob=0.75 is an approximation; calibration to USRDS listing data pending",
+        "wl_listing_prob=0.15: back-calculated from USRDS 2025 Fig 7.15 3-yr CIF=12% "
+        "(general ESRD p≈0.065/yr), scaled for donor-like 18-44 cohort via Figs 7.13+7.17 "
+        "(post-dialysis yr1 listing ≈9.2%, conditional p≈0.17/yr); conservative base 0.15; "
+        "sensitivity 0.05-0.30. Replaces prior placeholder 0.75.",
     ]
 
     save_params(params)
