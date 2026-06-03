@@ -27,10 +27,11 @@ Usage:
 import sys
 import argparse
 import numpy as np
+import matplotlib.pyplot as plt
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from utils import (load_life_table, load_params, DATA_PROC,
+from utils import (load_life_table, load_params, DATA_PROC, RESULTS,
                    weibull_annual_prob, weibull_scale_from_cumrisk_competing,
                    median_to_annual_tx_prob)
 
@@ -166,6 +167,70 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool):
     return total_ly / n, state_trace
 
 
+# ── PLOTTING ──────────────────────────────────────────────────────────────────
+_TEAL  = "#1D9E75"
+_CORAL = "#D85A30"
+_LIGHT = "#F1EFE8"
+_STATE_COLORS = {
+    "H":  "#4DB8A0",
+    "D1": "#E87A5D",
+    "D2": "#C4503A",
+    "WL": "#534AB7",
+    "PT": "#BA7517",
+}
+
+
+def make_fig_state_occupancy(trace_d, trace_nd, n):
+    """Fraction of initial cohort in each state over time, donor vs non-donor."""
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)
+    fig.patch.set_facecolor("#FAFAF8")
+
+    for ax, trace, title in zip(axes, [trace_d, trace_nd], ["Donor arm", "Non-donor arm"]):
+        ages = [t["age"] for t in trace]
+        for key, color in _STATE_COLORS.items():
+            vals = [t[key] / n for t in trace]
+            ax.plot(ages, vals, color=color, lw=1.8, label=key)
+        ax.set_facecolor(_LIGHT)
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.spines[["left", "bottom"]].set_color("#B4B2A9")
+        ax.tick_params(colors="#5F5E5A", labelsize=9)
+        ax.set_xlabel("Age", fontsize=9)
+        ax.set_ylabel("Fraction of cohort", fontsize=9)
+        ax.set_title(title, fontsize=11, fontweight="bold", color="#2C2C2A")
+        ax.legend(fontsize=9, frameon=False)
+
+    fig.suptitle("State occupancy over time — analytic cohort Markov",
+                 fontsize=12, fontweight="bold", color="#2C2C2A")
+    fig.tight_layout()
+    return fig
+
+
+def make_fig_survival(trace_d, trace_nd, n, age_at_entry):
+    """Survival curves for donor vs non-donor arms."""
+    fig, ax = plt.subplots(figsize=(8, 5))
+    fig.patch.set_facecolor("#FAFAF8")
+    ax.set_facecolor(_LIGHT)
+
+    ages_d  = [age_at_entry] + [t["age"] for t in trace_d]
+    surv_d  = [1.0] + [t["alive"] / n for t in trace_d]
+    ages_nd = [age_at_entry] + [t["age"] for t in trace_nd]
+    surv_nd = [1.0] + [t["alive"] / n for t in trace_nd]
+
+    ax.plot(ages_d,  surv_d,  color=_CORAL, lw=2, label="Donor")
+    ax.plot(ages_nd, surv_nd, color=_TEAL,  lw=2, label="Non-donor")
+    ax.legend(fontsize=10, frameon=False)
+    ax.set_xlabel("Age", fontsize=10)
+    ax.set_ylabel("Survival fraction", fontsize=10)
+    ax.set_ylim(0, 1)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.spines[["left", "bottom"]].set_color("#B4B2A9")
+    ax.tick_params(colors="#5F5E5A", labelsize=9)
+    ax.set_title("Survival curves — analytic cohort Markov",
+                 fontsize=12, fontweight="bold", color="#2C2C2A")
+    fig.tight_layout()
+    return fig
+
+
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 def main(age_at_entry: int = 40, n: int = N_PER_ARM):
     print("=" * 55)
@@ -193,6 +258,20 @@ def main(age_at_entry: int = 40, n: int = N_PER_ARM):
     last = trace_nd[-1]
     print(f"  Non-donor arm last:   yr={last['yr']}, age={last['age']}, "
           f"alive={last['alive']:.1f}")
+
+    fig_occ = make_fig_state_occupancy(trace_d, trace_nd, n)
+    occ_path = RESULTS / "cohort_markov_state_occupancy.png"
+    fig_occ.savefig(occ_path, dpi=150, bbox_inches="tight",
+                    facecolor=fig_occ.get_facecolor())
+    plt.close()
+    print(f"\nFigure saved: {occ_path}")
+
+    fig_surv = make_fig_survival(trace_d, trace_nd, n, age_at_entry)
+    surv_path = RESULTS / "cohort_markov_survival.png"
+    fig_surv.savefig(surv_path, dpi=150, bbox_inches="tight",
+                     facecolor=fig_surv.get_facecolor())
+    plt.close()
+    print(f"Figure saved: {surv_path}")
 
 
 if __name__ == "__main__":
