@@ -75,14 +75,16 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool):
         Per-cycle state counts, for inspection.
     """
     # Pre-compute time-invariant transition probabilities
-    wl_tx      = _wl_tx_prob(p, priority=donor)
-    wl_mort    = _wl_mort(p)
-    wl_remove  = float(p["wl_removal_rate_yr"])
-    wl_listing = float(p.get("wl_listing_prob", 1.0))
-    dial_mort1 = float(p["dialysis_1yr_mort"])
-    dial_mort  = float(p["dialysis_annual_mort"])
-    bg_hr      = float(p.get("donor_mort_hr", 1.0)) if donor else 1.0
-    graft_fail = float(p.get("graft_annual_fail_postyear1", 0.025))
+    wl_tx        = _wl_tx_prob(p, priority=donor)
+    wl_mort      = _wl_mort(p)
+    wl_remove    = float(p["wl_removal_rate_yr"])
+    wl_listing   = float(p.get("wl_listing_prob", 1.0))
+    dial_mort1   = float(p["dialysis_1yr_mort"])
+    dial_mort    = float(p["dialysis_annual_mort"])
+    bg_hr        = float(p.get("donor_mort_hr", 1.0)) if donor else 1.0
+    graft_fail   = float(p.get("graft_annual_fail_postyear1", 0.025))
+    preemptive_p = float(p.get(
+        "esrd_preemptive_prob_pld" if donor else "esrd_preemptive_prob_std", 0.0))
 
     # Weibull ESRD hazard calibrated to competing-risk 15-yr cumulative incidence
     cum_risk_15 = float(p["esrd_15yr_donor_overall"] if donor else p["esrd_15yr_nondonor"])
@@ -111,10 +113,12 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool):
         ptx_m  = _ptx_mort(p, age)
 
         # ── H (Healthy) ───────────────────────────────────────────────────
-        H_die  = H * q_bg
-        H_surv = H - H_die
-        H_esrd = H_surv * p_esrd    # → D1 (new ESRD onset)
-        H_stay = H_surv - H_esrd    # → H
+        H_die        = H * q_bg
+        H_surv       = H - H_die
+        H_esrd       = H_surv * p_esrd
+        H_preemptive = H_esrd * preemptive_p   # → WL directly (skip dialysis)
+        H_to_D1      = H_esrd - H_preemptive   # → D1 (dialysis year 1)
+        H_stay       = H_surv - H_esrd         # → H
 
         # ── D1 (ESRD year 1) ──────────────────────────────────────────────
         # After one full year, survivors leave D1 entirely: listed → WL, rest → D2
@@ -145,9 +149,9 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool):
 
         # ── Update state counts ───────────────────────────────────────────
         H  = H_stay
-        D1 = H_esrd                                      # only fresh ESRD
-        D2 = D1_to_D2 + D2_stay + WL_remove + PT_fail   # all returning flows
-        WL = D1_listed + D2_listed + WL_stay
+        D1 = H_to_D1                                          # non-preemptive ESRD → dialysis
+        D2 = D1_to_D2 + D2_stay + WL_remove + PT_fail        # all returning flows
+        WL = D1_listed + D2_listed + WL_stay + H_preemptive  # includes preemptive listings
         PT = WL_tx + PT_stay
 
         # ── Life-years: end-of-cycle convention (matches simulation) ──────

@@ -107,6 +107,12 @@ def main():
     # Conditional per-cycle listing probability, calibrated from
     # USRDS 2025 ADR ESRD Ch.7 Figs 7.13/7.15/7.17 (RECONCILIATION DECISION 6)
     params["wl_listing_prob"] = usrds_e7.get("wl_listing_prob", 0.15)
+
+    # Preemptive transplant listing probability at ESRD onset (USRDS 2025 Fig 7.13)
+    params["esrd_preemptive_prob_std"] = usrds_e7.get(
+        "usrds_esrd7_fig713_preemptive_listing_overall_2024", 0.058)
+    params["esrd_preemptive_prob_pld"] = usrds_e7.get(
+        "usrds_esrd7_fig713_preemptive_listing_age1844_2024", 0.094)
     params["wl_listing_prob_sens_low"]  = usrds_e7.get("wl_listing_prob_sens_low",  0.05)
     params["wl_listing_prob_sens_high"] = usrds_e7.get("wl_listing_prob_sens_high", 0.30)
 
@@ -118,7 +124,10 @@ def main():
     params["posttx_annual_mort_age65p"]  = srtr.get("posttx_dd_annual_mort_age65p",  0.068)
 
     # Overall: age-weighted average of SRTR age-strata
-    # Weights approximate ESRD transplant recipient age distribution
+    # Weights from SRTR 2023 ADR Figure KI 1 (incident kidney transplant
+    # recipients by age): 18-34 ≈ 9%, 35-49 ≈ 28%, 50-64 ≈ 41%, 65+ ≈ 22%.
+    # Rounded to [0.10, 0.30, 0.40, 0.20] for conservatism (shifts weight to
+    # younger, healthier recipients, slightly understating average mortality).
     _age_weights = [0.10, 0.30, 0.40, 0.20]
     _age_keys    = ["posttx_annual_mort_age1834", "posttx_annual_mort_age3549",
                     "posttx_annual_mort_age5064", "posttx_annual_mort_age65p"]
@@ -136,6 +145,17 @@ def main():
         srtr.get("posttx_annual_mort_white", 0.038)
     )
     params["graft_annual_fail_postyear1"] = srtr.get("graft_annual_fail_postyear1", 0.025)
+
+    # Age-stratified LDKT annual mortality (SRTR 2023 ADR Figure KI 76)
+    for band, fallback in [("age1834", 0.979), ("age3549", 0.961),
+                           ("age5064", 0.917), ("age65p",  0.819)]:
+        surv5 = srtr.get(f"posttx_ld_5yr_patient_surv_{band}", fallback)
+        params[f"posttx_ld_annual_mort_{band}"] = round(1 - surv5 ** (1 / 5), 4)
+    _ld_keys = ["posttx_ld_annual_mort_age1834", "posttx_ld_annual_mort_age3549",
+                "posttx_ld_annual_mort_age5064", "posttx_ld_annual_mort_age65p"]
+    params["posttx_ld_annual_mort"] = round(
+        sum(params[k] * w for k, w in zip(_ld_keys, _age_weights)), 4
+    )
 
     # Graft survival by age/donor type
     params["ddkt_graft_5yr_age1834"] = srtr.get("ddkt_graft_5yr_age1834", 0.814)

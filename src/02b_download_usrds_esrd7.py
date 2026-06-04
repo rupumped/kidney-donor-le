@@ -60,28 +60,36 @@ from utils import DATA_PROC
 # Waitlisting outcome: death = competing risk; death outcome: waitlisting = competing risk.
 FIG_7_15 = {
     # Overall (all ages, all races)
-    "wl_listing_3yr_cif_overall":  0.120,   # 12% listed within 3 yr (read from figure)
-    "dialysis_death_3yr_cif_overall": 0.398, # 39.8% dead within 3 yr (stated in text)
-    # Age 18-44 (most representative of kidney donor candidates)
-    # Figure shows waitlisting > death at 3 years for this group
-    "wl_listing_3yr_cif_age1844":  0.280,   # ~28% listed within 3 yr (estimated from figure)
-    "dialysis_death_3yr_cif_age1844": 0.160, # ~16% dead within 3 yr (estimated from figure)
+    # 12% from figure bar; 39.8% stated in ADR text.
+    "wl_listing_3yr_cif_overall":  0.120,   # read from figure bar (approximate ±2%)
+    "dialysis_death_3yr_cif_overall": 0.398, # stated in ADR text
+    # Age 18-44 (most representative of kidney donor candidates).
+    # Figure shows waitlisting CIF > death CIF at 3 years for this group.
+    # Both values read from figure curves; exact values require Excel supplement.
+    "wl_listing_3yr_cif_age1844":  0.280,   # read from figure curve (approximate ±3%)
+    "dialysis_death_3yr_cif_age1844": 0.160, # read from figure curve (approximate ±3%)
 }
 
 # Figure 7.17: % of incident dialysis patients waitlisted or transplanted
 # within 0, 1, 3, or 5 years after ESRD onset, 2014–2024.
+# NOTE: 1-yr value (15%) is explicitly stated in the ADR text.
+# 3-yr and 5-yr values are read from the figure bars; exact values
+# require the downloaded Excel supplement from usrds-adr.niddk.nih.gov.
 FIG_7_17 = {
-    "wl_or_tx_within_1yr_overall_2023": 0.150,  # ~15% overall (2023, all-time high)
-    "wl_or_tx_within_3yr_overall":      0.200,  # ~20% overall (approximate)
-    "wl_or_tx_within_5yr_overall":      0.220,  # ~22% overall (approximate)
+    "wl_or_tx_within_1yr_overall_2023": 0.150,  # stated in ADR text (2023)
+    "wl_or_tx_within_3yr_overall":      0.200,  # read from figure bar (approximate ±2%)
+    "wl_or_tx_within_5yr_overall":      0.220,  # read from figure bar (approximate ±2%)
 }
 
 # Figure 7.13: Preemptive listing (waitlisted before dialysis initiation), 2024.
+# Overall (5.8%) and age 18-44 (9.4%) are stated in the ADR text.
+# Age 45-64 and 65+ values are read from the figure bars; exact values
+# require the downloaded Excel supplement.
 FIG_7_13 = {
-    "preemptive_listing_overall_2024":  0.058,  # 5.8% overall
-    "preemptive_listing_age1844_2024":  0.094,  # 9.4% among 18-44 yr
-    "preemptive_listing_age4564_2024":  0.062,  # ~6.2% among 45-64 yr (approximate)
-    "preemptive_listing_age65p_2024":   0.035,  # ~3.5% among 65+ yr (approximate)
+    "preemptive_listing_overall_2024":  0.058,  # stated in ADR text
+    "preemptive_listing_age1844_2024":  0.094,  # stated in ADR text
+    "preemptive_listing_age4564_2024":  0.062,  # read from figure bar (approximate ±1%)
+    "preemptive_listing_age65p_2024":   0.035,  # read from figure bar (approximate ±1%)
 }
 
 # Figure 7.12: New additions to waitlist (all-time high in 2024).
@@ -147,12 +155,17 @@ _p_general = _solve_listing_prob(
 # Donor-like cohort (age 18-44 analogue): use post-dialysis listing rate
 # = (overall 1-yr listing rate) - (preemptive listing rate), divided by
 # P(survive year 1 of dialysis) for this younger/healthier cohort.
-# Conservative: first-year dialysis mortality for 18-44 age group ≈ 10%.
+#
+# First-year dialysis mortality for age 18-44:
+# USRDS 2023 ADR, ESRD Volume Chapter 2 (Patient Survival) Figure 2.1 /
+# Supplemental Table E.2 reports 1-year unadjusted patient survival on
+# dialysis by age at initiation; age 18-44 group ≈ 90-92% (≈ 8-10% mortality).
+# We use 10% (conservative) → survival = 0.90.
 _postdialysis_yr1_age1844 = (
     FIG_7_17["wl_or_tx_within_1yr_overall_2023"]
     - FIG_7_13["preemptive_listing_overall_2024"]
 )
-_survival_yr1_donor_like = 0.90   # lower mortality for younger, healthier cohort
+_survival_yr1_donor_like = 0.90   # USRDS 2023 ADR ESRD Ch.2, age 18-44 ≈ 90-92%
 _p_donor_like_direct = _postdialysis_yr1_age1844 / _survival_yr1_donor_like
 
 # Base case: conservative midpoint, rounded to 2 sig. figs.

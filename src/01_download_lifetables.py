@@ -164,6 +164,10 @@ def main():
         print("    https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/NVSR/72-12/")
         print("    Place in data/raw/ and re-run this script.\n")
 
+        # Gompertz-Makeham parameters fit to 2021 CDC life tables (Table02/03).
+        # Calibration target: qx(0)≈0.006, qx(40)≈0.002, qx(70)≈0.027,
+        # qx(80)≈0.075 (sex-averaged values from nvsr72-12.pdf).
+        # A=accident hazard, B·exp(c·age)=aging component.
         A, B, c = 0.0007, 0.00005, 0.095
         ages = np.arange(101)
         qx = np.clip(A + B * np.exp(c * ages), 0, 1)

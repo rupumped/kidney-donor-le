@@ -1,0 +1,19 @@
+Analysis,LE Donor (yr),LE Non-donor (yr),ΔLE (days),Note
+"Base case (age 40, overall)",38.05,38.15,-38.3,n=5M/arm
+PSA (probabilistic),—,—,"+29.5 [-1085.5, +1068.0]",P(beneficial)=48%
+Age at donation: 25,51.64,51.77,-47.4,
+Age at donation: 35,42.52,42.63,-41.8,
+Age at donation: 40,38.05,38.16,-37.0,
+Age at donation: 45,33.67,33.75,-31.0,
+Age at donation: 55,25.27,25.31,-17.3,
+Race: White donor,38.08,38.15,-25.1,age 40
+Race: Overall (base),38.04,38.15,-37.0,age 40
+Race: Black donor,37.87,38.09,-73.4,age 40
+Sex: Female donor,40.45,40.48,-29.9,age 40
+Sex: Overall (base),38.06,38.17,-37.0,age 40
+Sex: Male donor,35.97,36.09,-43.6,age 40
+Sensitivity: No priority (PLD=standard),—,—,-38.9,OWSA
+Sensitivity: Donor mort HR=1.30 (Mjøen),—,—,-1067.9,OWSA
+Sensitivity: ESRD RR ×11 (Mjøen upper),—,—,-53.7,OWSA
+Sensitivity: PLD wait 50 days (optimistic),—,—,-36.9,OWSA
+Sensitivity: Post-Tx: LDKT quality,—,—,-22.7,OWSA

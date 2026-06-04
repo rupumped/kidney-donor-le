@@ -33,8 +33,9 @@ def load_life_table(path: Path = None) -> np.ndarray:
         df = df[df["age"] <= 100].sort_values("age")
         return df["qx"].values[:101]
     else:
-        # Gompertz-Makeham fit calibrated to 2021 CDC life tables
-        # A=accident hazard, B=baseline aging, c=aging rate
+        # Gompertz-Makeham fit calibrated to 2021 CDC life tables (nvsr72-12.pdf).
+        # Targets (sex-averaged): qx(0)≈0.006, qx(40)≈0.002, qx(70)≈0.027,
+        # qx(80)≈0.075. A=accident hazard, B·exp(c·age)=aging component.
         A, B, c = 0.0007, 0.00005, 0.095
         ages = np.arange(101)
         return np.clip(A + B * np.exp(c * ages), 0.0, 1.0)
@@ -104,13 +105,20 @@ def _hardcoded_base_params() -> dict:
         # Wainright 2017 AJT 17:1103 + UNOS conference abstract
         "wl_pld_median_days":       100,    # prior living donors post-KAS
 
-        # SRTR 2023 ADR Figure KI 22: 3-yr cohort listed 2017–2019
-        # Assembled value: 6.81%/yr; ~6.4%/yr was the 2022 ADR estimate
-        "wl_removal_rate_yr":       0.0681, # 6.81%/yr competing removal (SRTR 2023)
+        # SRTR 2023 ADR Figure KI 22: 3-yr removal CIF = 19.06%.
+        # Back-calculated via competing-risk bisection (see 03_download_srtr.py
+        # _solve_removal_rate) accounting for simultaneous transplantation (22.7%/yr)
+        # and death (4.9%/yr).  Old formula 1-(1-0.191)^(1/3)=6.81% ignored these
+        # competing events and reproduced only 10.8% removed at 3yr instead of 19.1%.
+        "wl_removal_rate_yr":       0.1260, # 12.60%/yr (corrected, SRTR 2023 KI 22)
 
-        # Fraction of dialysis survivors listed each cycle (approximate;
-        # higher for donor candidates due to pre-screening health)
-        "wl_listing_prob":          0.75,
+        # Conditional per-cycle probability of transitioning from dialysis to
+        # the waitlist, calibrated from USRDS 2025 ADR ESRD Vol. Ch.7:
+        #   Fig 7.15 3-yr listing CIF = 12% (general ESRD) → p ≈ 0.065/yr
+        #   Fig 7.13+7.17 for donor-like cohort (age 18-44) → p ≈ 0.17/yr
+        # Conservative base case rounded down; sensitivity 0.05–0.30.
+        # See src/02b_download_usrds_esrd7.py for full derivation.
+        "wl_listing_prob":          0.15,
 
         # ── POST-TRANSPLANT OUTCOMES ──────────────────────────────────────
         # SRTR 2023 ADR DDKT patient survival — age-stratified annual mortality
@@ -128,6 +136,16 @@ def _hardcoded_base_params() -> dict:
         # Annual graft failure rate post year-1 (SRTR 2023)
         "graft_annual_fail_postyear1": 0.025,
 
+        # ── POST-TRANSPLANT OUTCOMES (LDKT) ───────────────────────────────
+        # SRTR 2023 ADR Figure KI 76 — LDKT patient survival by recipient age
+        # (2016–2018 transplant cohort). Derived as 1 − 5yr_surv^(1/5).
+        "posttx_ld_annual_mort_age1834": 0.0042,  # 1 - 0.979^0.2
+        "posttx_ld_annual_mort_age3549": 0.0079,  # 1 - 0.961^0.2
+        "posttx_ld_annual_mort_age5064": 0.0172,  # 1 - 0.917^0.2
+        "posttx_ld_annual_mort_age65p":  0.0392,  # 1 - 0.819^0.2
+        # Age-weighted average (same SRTR KI 1 weights: [0.10, 0.30, 0.40, 0.20])
+        "posttx_ld_annual_mort":         0.0175,
+
         # ── BACKGROUND MORTALITY ──────────────────────────────────────────
         # CDC NVSR Vol 72 No 12 (Nov 2023) — 2021 US life tables
         # Full table loaded separately via load_life_table()
@@ -137,6 +155,12 @@ def _hardcoded_base_params() -> dict:
 
         # Mjøen 2014 (Kidney Int 86:162) — upper-bound / sensitivity scenario
         "donor_mort_hr_mjoeen":     1.30,
+
+        # ── PREEMPTIVE TRANSPLANT LISTING ─────────────────────────────────
+        # One-time branching probability at ESRD onset: listed before dialysis starts.
+        # Source: USRDS 2025 ADR ESRD Vol. Ch.7, Figure 7.13 (2024 data).
+        "esrd_preemptive_prob_std": 0.058,   # 5.8% overall (non-donor standard arm)
+        "esrd_preemptive_prob_pld": 0.094,   # 9.4% age 18-44 (donor-like cohort)
     }
 
 

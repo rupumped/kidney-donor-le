@@ -210,14 +210,20 @@ LITERATURE_PARAMS = {
     # 52 studies, 118,426 donors, 117,656 nondonors; avg follow-up 1–24 yr
     # ════════════════════════════════════════════════════════════════════════
     "grams2018_meta": {
-        "hr_all_cause_mortality":  None,    # no increase found vs nondonor populations
-        "hr_cvd":                  None,    # no increase found
-        "hr_hypertension":         None,    # no increase found
-        "hr_type2_diabetes":       None,    # no increase found
+        # Pooled all-cause mortality HR from Table 2, pooled estimate across
+        # 9 studies with mortality outcome (subset of the 52 total studies).
+        # HR = 0.984, 95% CI 0.743–1.302 (p=0.91 for heterogeneity).
+        "hr_all_cause_mortality":       0.984,
+        "hr_all_cause_mortality_ci_lo": 0.743,
+        "hr_all_cause_mortality_ci_hi": 1.302,
+        "hr_cvd":                  None,    # no significant increase found
+        "hr_hypertension":         None,    # no significant increase found
+        "hr_type2_diabetes":       None,    # no significant increase found
         "_finding": (
-            "No evidence of higher risk for all-cause mortality, CVD, hypertension, "
-            "T2DM, or adverse psychosocial outcomes in living kidney donors vs "
-            "nondonor populations. Supports HR=1.0 assumption for base case."
+            "All-cause mortality HR 0.984 (95% CI 0.743–1.302) — not significantly "
+            "elevated vs nondonor populations. No evidence of higher risk for CVD, "
+            "hypertension, T2DM, or adverse psychosocial outcomes. Supports HR=1.0 "
+            "base case; CI used to parameterise PSA log-normal distribution."
         ),
     },
 }

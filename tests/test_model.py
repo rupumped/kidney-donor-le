@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from utils import (load_life_table, _hardcoded_base_params,
-                   weibull_scale_from_cumrisk, weibull_annual_prob,
-                   median_to_annual_tx_prob)
+                   weibull_scale_from_cumrisk, weibull_scale_from_cumrisk_competing,
+                   weibull_annual_prob, median_to_annual_tx_prob)
 
 # Import model functions without running main
 import importlib.util, types
@@ -94,6 +94,45 @@ class TestWeibullCalibration:
         p_nd = weibull_annual_prob(5, lam_nd, k)
         rr = p_d / p_nd
         assert 6 < rr < 11, f"Donor:nondonor probability ratio at t=5 should be ~8×, got {rr:.1f}×"
+
+    def test_competing_risk_calibration(self):
+        """weibull_scale_from_cumrisk_competing must reproduce the target competing-risk CIF.
+
+        This is the function actually used in the simulation; the simpler
+        weibull_scale_from_cumrisk (tested above) is not used at runtime.
+        """
+        qx     = load_life_table()
+        target = BASE["esrd_15yr_donor_overall"]
+        k      = BASE["weibull_shape"]
+        age0   = 40
+        lam    = weibull_scale_from_cumrisk_competing(target, k, qx, age0, bg_hr=1.0)
+        # Replicate the competing-risk integration from weibull_scale_from_cumrisk_competing
+        cif, s_bg = 0.0, 1.0
+        for t in range(15):
+            cif  += s_bg * weibull_annual_prob(t, lam, k)
+            s_bg *= 1.0 - qx[min(age0 + t, 100)]
+        assert abs(cif - target) / target < 0.001, (
+            f"Competing-risk calibration off: target={target:.4%}, achieved={cif:.4%}"
+        )
+
+    def test_competing_risk_bg_hr_effect(self):
+        """Higher bg_hr requires a smaller Weibull lambda to hit the same CIF.
+
+        Higher background mortality depletes the at-risk pool faster (stronger
+        competing risk), which lowers the observed ESRD CIF.  To compensate and
+        still match the target CIF, the intrinsic ESRD hazard must be higher —
+        and in the Weibull parameterisation S(t)=exp(-(t/λ)^k), smaller λ means
+        higher hazard, so λ must decrease.
+        """
+        qx     = load_life_table()
+        target = BASE["esrd_15yr_donor_overall"]
+        k      = BASE["weibull_shape"]
+        lam_hr1  = weibull_scale_from_cumrisk_competing(target, k, qx, 40, bg_hr=1.0)
+        lam_hr13 = weibull_scale_from_cumrisk_competing(target, k, qx, 40, bg_hr=1.30)
+        assert lam_hr13 < lam_hr1, (
+            f"Higher bg_hr needs smaller lambda (stronger hazard); "
+            f"got lam_hr1={lam_hr1:.2f}, lam_hr13={lam_hr13:.2f}"
+        )
 
 
 # ────────────────────────────────────────────────────────────────────────────

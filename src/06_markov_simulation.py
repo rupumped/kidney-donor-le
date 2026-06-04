@@ -101,9 +101,11 @@ def sample_params(rng):
 	# 95% CrI of roughly [0.03, 0.27], consistent with the acknowledged range.
 	p["wl_listing_prob"] = beta_sample("wl_listing_prob", 0.40)
 
-	# Donor mortality HR: log-normal calibrated to O'Keeffe 2018 meta-analysis
-	# (9 studies, pooled HR 0.984 [0.743, 1.302]; Ann Intern Med, PMID 29379948)
-	# mu = mean(ln(0.743), ln(1.302)) = -0.016; sigma = (ln(1.302)-ln(0.743))/(2*1.96) = 0.143
+	# Donor mortality HR: log-normal calibrated to Grams 2018 meta-analysis
+	# (PMID 29379948; Ann Intern Med 2018;168:276–284; 52 studies, 118,426 donors).
+	# All-cause mortality pooled HR ≈ 0.984 (95% CI 0.743–1.302) vs nondonors.
+	# mu  = [ln(0.743) + ln(1.302)] / 2 = -0.016
+	# sigma = [ln(1.302) - ln(0.743)] / (2 × 1.96) = 0.143
 	p["donor_mort_hr"] = float(np.exp(rng.normal(-0.016, 0.143)))
 
 	return p
@@ -180,11 +182,16 @@ def simulate_cohort(p, n, age_at_entry, donor: bool, rng, life_table=None):
 	wl_mort    = waitlist_annual_mort(p)
 	wl_remove  = p["wl_removal_rate_yr"]
 	wl_listing = p.get("wl_listing_prob", 1.0)
+	wl_state   = 3 if donor else 2
 
 	dial_mort1 = p["dialysis_1yr_mort"]   # first year on dialysis
 	dial_mort  = p["dialysis_annual_mort"]
 	bg_hr      = p.get("donor_mort_hr", 1.0) if donor else 1.0
 	graft_fail_rate = p.get("graft_annual_fail_postyear1", 0.025)
+
+	# One-time preemptive listing probability at ESRD onset (USRDS 2025 Fig 7.13)
+	preemptive_p = float(p.get(
+		"esrd_preemptive_prob_pld" if donor else "esrd_preemptive_prob_std", 0.0))
 
 	# Track time in ESRD state for first-year mortality
 	esrd_time  = np.zeros(n)
@@ -210,8 +217,13 @@ def simulate_cohort(p, n, age_at_entry, donor: bool, rng, life_table=None):
 
 			idx = np.where(mask0)[0]
 			new_state[idx[die_bg]] = 5
-			new_state[idx[~die_bg & get_esrd]] = 1
-			esrd_time[idx[~die_bg & get_esrd]] = 0
+			esrd_idx = idx[get_esrd]
+			if esrd_idx.size:
+				# Branch at ESRD onset: preemptive listing (skip dialysis) vs dialysis yr 1
+				is_preemptive = u[esrd_idx, 2] < preemptive_p
+				new_state[esrd_idx[is_preemptive]]  = wl_state  # → waitlist, bypass dialysis
+				new_state[esrd_idx[~is_preemptive]] = 1          # → dialysis year 1
+				esrd_time[esrd_idx[~is_preemptive]] = 0
 
 		# ── (1) ESRD / DIALYSIS ───────────────────────────────────────────
 		mask1 = (state == 1) & alive
@@ -223,7 +235,6 @@ def simulate_cohort(p, n, age_at_entry, donor: bool, rng, life_table=None):
 			# Listing gate: not all survivors are listed each cycle
 			get_listed = (~die_dial) & (u[mask1, 1] < wl_listing)
 			new_state[idx[die_dial]]   = 5
-			wl_state = 3 if donor else 2
 			new_state[idx[get_listed]] = wl_state
 			# Increment counter for everyone in state 1 this cycle;
 			# those transitioning to WL won't re-enter mask1 next cycle
@@ -291,14 +302,16 @@ def run_arm_analytic(p, age_at_entry: int, donor: bool, life_table=None) -> floa
 	"""
 	lt = life_table if life_table is not None else LIFE_TABLE_QX
 
-	wl_tx      = waitlist_annual_tx_prob(p, priority=donor)
-	wl_mort_p  = waitlist_annual_mort(p)
-	wl_remove  = float(p["wl_removal_rate_yr"])
-	wl_listing = float(p.get("wl_listing_prob", 1.0))
-	dial_mort1 = float(p["dialysis_1yr_mort"])
-	dial_mort  = float(p["dialysis_annual_mort"])
-	bg_hr      = float(p.get("donor_mort_hr", 1.0)) if donor else 1.0
-	graft_fail = float(p.get("graft_annual_fail_postyear1", 0.025))
+	wl_tx         = waitlist_annual_tx_prob(p, priority=donor)
+	wl_mort_p     = waitlist_annual_mort(p)
+	wl_remove     = float(p["wl_removal_rate_yr"])
+	wl_listing    = float(p.get("wl_listing_prob", 1.0))
+	dial_mort1    = float(p["dialysis_1yr_mort"])
+	dial_mort     = float(p["dialysis_annual_mort"])
+	bg_hr         = float(p.get("donor_mort_hr", 1.0)) if donor else 1.0
+	graft_fail    = float(p.get("graft_annual_fail_postyear1", 0.025))
+	preemptive_p  = float(p.get(
+		"esrd_preemptive_prob_pld" if donor else "esrd_preemptive_prob_std", 0.0))
 
 	cum_risk_15 = float(p["esrd_15yr_donor_overall"] if donor else p["esrd_15yr_nondonor"])
 	wbl_k   = float(p["weibull_shape"])
@@ -322,6 +335,9 @@ def run_arm_analytic(p, age_at_entry: int, donor: bool, life_table=None) -> floa
 
 		H_die  = H * q_bg;     H_surv = H - H_die
 		H_esrd = H_surv * p_esrd;      H_stay = H_surv - H_esrd
+		# At ESRD onset, branch: preemptive → WL (skip dialysis), rest → D1
+		H_preemptive = H_esrd * preemptive_p
+		H_to_D1      = H_esrd - H_preemptive
 
 		D1_die    = D1 * dial_mort1;   D1_surv   = D1 - D1_die
 		D1_listed = D1_surv * wl_listing;         D1_to_D2  = D1_surv - D1_listed
@@ -337,9 +353,9 @@ def run_arm_analytic(p, age_at_entry: int, donor: bool, life_table=None) -> floa
 		PT_fail = PT_surv * graft_fail;            PT_stay = PT_surv - PT_fail
 
 		H  = H_stay
-		D1 = H_esrd
+		D1 = H_to_D1
 		D2 = D1_to_D2 + D2_stay + WL_remove + PT_fail
-		WL = D1_listed + D2_listed + WL_stay
+		WL = D1_listed + D2_listed + WL_stay + H_preemptive
 		PT = WL_tx + PT_stay
 
 		total_ly += (H + D1 + D2 + WL + PT) * CYCLE_YRS
@@ -415,6 +431,14 @@ def run_owsa(age_at_donation=40):
 		"Dialysis mort +50%":            {"dialysis_annual_mort": 0.255},
 		"Dialysis mort -50%":            {"dialysis_annual_mort": 0.085},
 		"Donor mort HR=1.30 (Mjøen)":    {"donor_mort_hr": 1.30},
+		# Post-Tx survival: LDKT quality vs base-case DDKT (SRTR 2023 ADR Fig KI 76)
+		"Post-Tx: LDKT quality":         {
+			"posttx_annual_mort_age1834": BASE.get("posttx_ld_annual_mort_age1834", 0.0042),
+			"posttx_annual_mort_age3549": BASE.get("posttx_ld_annual_mort_age3549", 0.0079),
+			"posttx_annual_mort_age5064": BASE.get("posttx_ld_annual_mort_age5064", 0.0172),
+			"posttx_annual_mort_age65p":  BASE.get("posttx_ld_annual_mort_age65p",  0.0392),
+			"posttx_annual_mort":         BASE.get("posttx_ld_annual_mort",          0.0175),
+		},
 	}
 
 	results = {}
@@ -470,12 +494,19 @@ def _age_adjust_esrd_nonblack(base_rate: float, age: int, reference_age: int = 4
 
 
 # Grams 2016 direct sex×race non-donor baselines (Table 2, NEJM 374:411).
-# Used instead of sex-HR-derived values where exact figures are published.
+# Option C sourcing rule: use this table wherever sex or race is stratified.
+# For race-unspecified ("Overall") sex analyses we use the White sex-specific
+# rates as a conservative approximation — White donors dominate the SRTR pool
+# (~70%) and Grams White female (0.04%) ≈ Muzaale matched-control overall
+# (0.039%), so the overall and sex-only panels remain comparable.
 _GRAMS_NONDONOR = {
-	("Black", "Female"): 0.0015,   # 0.15%
-	("Black", "Male"):   0.0024,   # 0.24%
-	("White", "Female"): 0.0004,   # 0.04%
-	("White", "Male"):   0.0006,   # 0.06%
+	("Black",   "Female"): 0.0015,   # 0.15%
+	("Black",   "Male"):   0.0024,   # 0.24%
+	("White",   "Female"): 0.0004,   # 0.04%
+	("White",   "Male"):   0.0006,   # 0.06%
+	# Sex-stratified, race-unspecified: White rates as donor-pool approximation
+	("Overall", "Female"): 0.0004,
+	("Overall", "Male"):   0.0006,
 }
 
 
@@ -529,28 +560,29 @@ def run_sex_subgroups(age_at_donation=40, n=500_000):
 	lt_male   = load_life_table(lt_m_path if lt_m_path.exists() else None)
 	lt_female = load_life_table(lt_f_path if lt_f_path.exists() else None)
 
-	# Derive sex-specific ESRD rates via Massie 2017 HR for male sex (1.88).
-	# Assumed sex mix: 60% female donors (consistent with SRTR registry figures).
+	# Donor ESRD rates: scaled via Massie 2017 within-donor sex HR (1.88).
+	# Sex mix: 60% female — SRTR 2023 ADR Figure KI 7 (59–61%, 2019–2023).
+	# Non-donor rates: Grams 2016 sex-specific direct values (Option C).
+	# Using Massie HR to scale the non-donor arm is inappropriate because that
+	# HR was estimated within the donor cohort, not the general population.
 	f_female = 0.60
 	f_male   = 1.0 - f_female
 	hr_male  = float(BASE.get("hr_male_sex", 1.88))
-	denom    = f_female + f_male * hr_male  # scaling denominator
+	denom    = f_female + f_male * hr_male
 
-	donor_f    = BASE["esrd_15yr_donor_overall"] / denom
-	donor_m    = donor_f * hr_male
-	nondonor_f = BASE["esrd_15yr_nondonor"] / denom
-	nondonor_m = nondonor_f * hr_male
+	donor_f = BASE["esrd_15yr_donor_overall"] / denom
+	donor_m = donor_f * hr_male
 
 	scenarios = {
 		"Female donor": {
 			"esrd_15yr_donor_overall": donor_f,
-			"esrd_15yr_nondonor":      nondonor_f,
+			"esrd_15yr_nondonor":      _GRAMS_NONDONOR[("Overall", "Female")],
 			"_lt": lt_female,
 		},
 		"Overall (base)": {"_lt": LIFE_TABLE_QX},
 		"Male donor": {
 			"esrd_15yr_donor_overall": donor_m,
-			"esrd_15yr_nondonor":      nondonor_m,
+			"esrd_15yr_nondonor":      _GRAMS_NONDONOR[("Overall", "Male")],
 			"_lt": lt_male,
 		},
 	}
@@ -924,20 +956,22 @@ def make_age_sex_matrix():
 	lt_male   = load_life_table(lt_m_path if lt_m_path.exists() else None)
 	lt_female = load_life_table(lt_f_path if lt_f_path.exists() else None)
 
-	f_female = 0.60
+	# Donor rates: Massie 2017 within-donor sex HR. Non-donor rates: Grams 2016
+	# sex-specific direct values (Option C — same sourcing as sex×race matrix).
+	f_female = 0.60  # SRTR 2023 ADR Figure KI 7: 59-61% of LD donors female
 	hr_male  = float(BASE.get("hr_male_sex", 1.88))
 	denom    = f_female + (1.0 - f_female) * hr_male
 
 	sex_params = {
 		"Female": {
 			"esrd_15yr_donor_overall": BASE["esrd_15yr_donor_overall"] / denom,
-			"esrd_15yr_nondonor":      BASE["esrd_15yr_nondonor"] / denom,
+			"esrd_15yr_nondonor":      _GRAMS_NONDONOR[("Overall", "Female")],
 			"_lt": lt_female,
 		},
 		"Overall": {"_lt": LIFE_TABLE_QX},
 		"Male": {
 			"esrd_15yr_donor_overall": BASE["esrd_15yr_donor_overall"] * hr_male / denom,
-			"esrd_15yr_nondonor":      BASE["esrd_15yr_nondonor"] * hr_male / denom,
+			"esrd_15yr_nondonor":      _GRAMS_NONDONOR[("Overall", "Male")],
 			"_lt": lt_male,
 		},
 	}
@@ -1000,7 +1034,7 @@ def make_sex_race_matrix():
 	lt_male   = load_life_table(lt_m_path if lt_m_path.exists() else None)
 	lt_female = load_life_table(lt_f_path if lt_f_path.exists() else None)
 
-	f_female = 0.60
+	f_female = 0.60  # SRTR 2023 ADR Figure KI 7: 59-61% of LD donors female
 	hr_male  = float(BASE.get("hr_male_sex", 1.88))
 	denom    = f_female + (1.0 - f_female) * hr_male
 
@@ -1103,7 +1137,7 @@ def make_age_race_sex_matrix():
 	lt_male   = load_life_table(lt_m_path if lt_m_path.exists() else None)
 	lt_female = load_life_table(lt_f_path if lt_f_path.exists() else None)
 
-	f_female = 0.60
+	f_female = 0.60  # SRTR 2023 ADR Figure KI 7: 59-61% of LD donors female
 	hr_male  = float(BASE.get("hr_male_sex", 1.88))
 	denom    = f_female + (1.0 - f_female) * hr_male
 
@@ -1247,7 +1281,8 @@ def make_results_table(base_res, psa_diffs, owsa_res, age_res, race_res, sex_res
 			})
 
 	for lbl in ["No priority (PLD=standard)", "Donor mort HR=1.30 (Mjøen)",
-				"ESRD RR ×11 (Mjøen upper)", "PLD wait 50 days (optimistic)"]:
+				"ESRD RR ×11 (Mjøen upper)", "PLD wait 50 days (optimistic)",
+				"Post-Tx: LDKT quality"]:
 		rows.append({
 			"Analysis": f"Sensitivity: {lbl}",
 			"LE Donor (yr)": "—",
