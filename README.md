@@ -39,7 +39,8 @@ kidney-donor-le/
 │       ├── usrds_esrd7_params.json
 │       └── usrds_params.json
 ├── paper/
-│   └── markov_model_kidney_donation.svg   # Markov model diagram for paper
+│   ├── markov_model_kidney_donation.svg   # Markov model diagram for paper
+│   └── methods.tex                        # LaTeX methods section
 ├── src/
 │   ├── 01_download_lifetables.py    # CDC NVSR 2021 US life tables
 │   ├── 02_download_usrds.py         # USRDS ADR 2025 CKD Chapter 1 (general CKD)
@@ -53,10 +54,11 @@ kidney-donor-le/
 │   ├── 05_assemble_parameters.py    # Combines all sources into params.json
 │   ├── 06_markov_simulation.py      # Main Monte Carlo simulation (PSA + OWSA)
 │   ├── 07_cohort_markov.py          # Analytic (deterministic) cohort Markov model
+│   ├── 08_calibration.py            # Face-validity checks vs SRTR KI 22 / KI 70
 │   └── utils.py                     # Shared helpers
 ├── results/                         # Output figures and tables
 │   ├── kidney_model_results.csv          # Summary table of all analyses
-│   ├── kidney_model_results.png          # Base-case ΔLE distribution
+│   ├── calibration_report.txt            # Face-validity calibration summary
 │   ├── kidney_model_A_distributions.png  # Input parameter distributions
 │   ├── kidney_model_B_psa.png            # Probabilistic sensitivity analysis
 │   ├── kidney_model_C_tornado.png        # One-way sensitivity (tornado) diagram
@@ -144,6 +146,14 @@ Key takeaways:
 - **Critical uncertainty:** If Mjøen 2014 all-cause mortality HR (1.30) is correct rather than Muzaale/US data (HR ≈ 1.0), net harm increases to ~3 years
 - **LDKT vs DDKT:** If post-Tx survival at LDKT quality, harm falls to −23 days (vs −38 base)
 - **PSA:** P(donation beneficial) ≈ 48%; mean ΔLE +29.5 days [−1086, +1068] reflecting this uncertainty
+
+## Testing
+
+```bash
+python3 -m pytest tests/ -v
+```
+
+Tests require `data/processed/` to be populated (run scripts 01–05 first).
 
 ## Citation
 This model cites the primary data sources:

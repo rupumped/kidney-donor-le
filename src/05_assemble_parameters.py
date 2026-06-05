@@ -82,6 +82,7 @@ def main():
     params["hr_black_race"]             = mas.get("hr_black_race", 2.96)
     params["hr_male_sex"]               = mas.get("hr_male_sex", 1.88)
     params["hr_age_per_decade_nonblack"] = mas.get("hr_age_per_10yr_nonblack", 1.40)
+    params["hr_age_per_decade_nondonor"] = mas.get("hr_age_per_10yr_nondonor", 1.40)
 
     # ── DIALYSIS / ESRD SURVIVAL ──────────────────────────────────────────
     params["dialysis_1yr_mort"]        = usrds.get("hd_1yr_mortality", 0.22)
@@ -95,7 +96,7 @@ def main():
     )
     params["wl_mort_black_per_100py"]    = srtr.get("pretx_mort_per_100py_black", 4.62)
     params["wl_mort_white_per_100py"]    = srtr.get("pretx_mort_per_100py_white", 5.71)
-    params["wl_removal_rate_yr"]         = srtr.get("wl_annual_removal_competing", 0.0681)
+    params["wl_removal_rate_yr"]         = srtr.get("wl_annual_removal_competing", 0.1260)
 
     # Wait times: post-KAS250 figures (RECONCILIATION DECISION 2)
     params["wl_std_median_days"] = srtr.get("wl_std_median_days", 985)

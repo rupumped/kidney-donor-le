@@ -180,12 +180,14 @@ def summary(wl_lines, posttx_lines):
         lines.append(f"  [{flag}]  {label:<38}  model {pred:.1%}  obs {obs:.1%}  "
                      f"Δ = {err:+.0f}%")
 
+    mort_obs = 0.068
+    mort_err = round(100 * (cum_died - mort_obs) / mort_obs)
     lines += [
         "",
         "  Interpretation:",
         "  - Transplant rate is well-calibrated (+5%); the exponential-median",
         "    model for wait time aligns with SRTR observed 3-year Tx fraction.",
-        "  - Mortality is over-predicted (+54%); see note [A]. This is conservative",
+        f"  - Mortality is over-predicted ({mort_err:+d}%); see note [A]. This is conservative",
         "    (slightly overstates the cost of the waitlist period for both arms).",
         "  - The model cannot be validated against an independent end-to-end",
         "    dataset (donation → ESRD → transplant) because no such cohort exists.",

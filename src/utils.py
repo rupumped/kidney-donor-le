@@ -88,6 +88,7 @@ def _hardcoded_base_params() -> dict:
         "hr_black_race":            2.96,   # 95% CI 2.25–3.89
         "hr_male_sex":              1.88,   # 95% CI 1.50–2.35
         "hr_age_per_decade_nonblack": 1.40, # 95% CI 1.23–1.59 (non-Black only)
+        "hr_age_per_decade_nondonor": 1.40, # proxy: population ESRD age-gradient
 
         # ── DIALYSIS / ESRD SURVIVAL ──────────────────────────────────────
         # USRDS ADR 2023 / Renal Fellow Network USRDS summary
@@ -103,7 +104,7 @@ def _hardcoded_base_params() -> dict:
         # SRTR 2023 ADR / Schold AJT 2023 — post-KAS250 (March 2021)
         "wl_std_median_days":       985,    # ~32.8 months overall
         # Wainright 2017 AJT 17:1103 + UNOS conference abstract
-        "wl_pld_median_days":       100,    # prior living donors post-KAS
+        "wl_pld_median_days":       102.6,  # prior living donors post-KAS
 
         # SRTR 2023 ADR Figure KI 22: 3-yr removal CIF = 19.06%.
         # Back-calculated via competing-risk bisection (see 03_download_srtr.py

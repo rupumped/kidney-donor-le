@@ -63,7 +63,7 @@ def _ptx_mort(p, age: int) -> float:
 
 
 # ── COHORT SIMULATION ─────────────────────────────────────────────────────────
-def run_arm(p, n: float, age_at_entry: int, donor: bool):
+def run_arm(p, n: float, age_at_entry: int, donor: bool, life_table=None):
     """
     Propagate a cohort of n people forward through annual Markov cycles.
 
@@ -74,6 +74,8 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool):
     state_trace : list of dicts
         Per-cycle state counts, for inspection.
     """
+    lt = life_table if life_table is not None else LIFE_TABLE_QX
+
     # Pre-compute time-invariant transition probabilities
     wl_tx        = _wl_tx_prob(p, priority=donor)
     wl_mort      = _wl_mort(p)
@@ -90,7 +92,7 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool):
     cum_risk_15 = float(p["esrd_15yr_donor_overall"] if donor else p["esrd_15yr_nondonor"])
     wbl_k   = float(p["weibull_shape"])
     wbl_lam = weibull_scale_from_cumrisk_competing(
-        cum_risk_15, wbl_k, LIFE_TABLE_QX, age_at_entry, bg_hr
+        cum_risk_15, wbl_k, lt, age_at_entry, bg_hr
     )
 
     # Initial state vector — everyone healthy
@@ -108,7 +110,7 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool):
         age = age_at_entry + yr
 
         # ── Year-varying transition probabilities ──────────────────────────
-        q_bg   = LIFE_TABLE_QX[min(age, MAX_AGE)] * bg_hr
+        q_bg   = lt[min(age, MAX_AGE)] * bg_hr
         p_esrd = weibull_annual_prob(float(yr), wbl_lam, wbl_k)
         ptx_m  = _ptx_mort(p, age)
 

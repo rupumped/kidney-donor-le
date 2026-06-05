@@ -22,13 +22,18 @@ Usage:
   python src/06_markov_simulation.py
 
 Outputs in results/:
-  kidney_model_results.png      — six-panel figure
-  kidney_model_results.csv      — summary table
-  kidney_model_race.png             — race-stratified LE distributions
-  kidney_model_sex.png              — sex-stratified LE distributions
-  kidney_model_age_sex_matrix.png   — age × sex ΔLE heatmap
-  kidney_model_sex_race_matrix.png  — sex × race ΔLE heatmap
-  kidney_model_age_race_sex_matrix.png — age × race faceted by sex (all three variables)
+  kidney_model_results.csv              — summary table
+  kidney_model_A_distributions.png      — input parameter distributions
+  kidney_model_B_psa.png                — probabilistic sensitivity analysis
+  kidney_model_C_tornado.png            — one-way sensitivity (tornado) diagram
+  kidney_model_D_age_subgroup.png       — ΔLE by age at donation
+  kidney_model_E_race_subgroup.png      — ΔLE by race
+  kidney_model_race.png                 — race-stratified LE distributions
+  kidney_model_sex.png                  — sex-stratified LE distributions
+  kidney_model_age_race_matrix.png      — age × race ΔLE heatmap
+  kidney_model_age_sex_matrix.png       — age × sex ΔLE heatmap
+  kidney_model_sex_race_matrix.png      — sex × race ΔLE heatmap
+  kidney_model_age_race_sex_matrix.png  — age × race faceted by sex (all three variables)
 """
 
 import sys
@@ -462,6 +467,8 @@ def run_age_subgroups():
 		p    = BASE.copy()
 		p["esrd_15yr_donor_overall"] = _age_adjust_esrd_nonblack(
 			BASE["esrd_15yr_donor_overall"], age)
+		p["esrd_15yr_nondonor"]      = _age_adjust_esrd_nondonor(
+			BASE["esrd_15yr_nondonor"], age)
 		le_d  = run_arm_analytic(p, age, donor=True)
 		le_nd = run_arm_analytic(p, age, donor=False)
 		diff  = le_d - le_nd
@@ -490,6 +497,12 @@ def _scale_posttx_mort(base_params: dict, target_overall: float) -> dict:
 def _age_adjust_esrd_nonblack(base_rate: float, age: int, reference_age: int = 40) -> float:
 	"""Scale non-Black donor ESRD rate by Massie 2017 HR per decade (1.40/decade)."""
 	hr = float(BASE.get("hr_age_per_decade_nonblack", 1.40))
+	return base_rate * hr ** ((age - reference_age) / 10)
+
+
+def _age_adjust_esrd_nondonor(base_rate: float, age: int, reference_age: int = 40) -> float:
+	"""Scale non-donor ESRD rate by population age-gradient (proxy: 1.40/decade)."""
+	hr = float(BASE.get("hr_age_per_decade_nondonor", 1.40))
 	return base_rate * hr ** ((age - reference_age) / 10)
 
 
@@ -792,7 +805,7 @@ def make_fig_race_subgroup(race_res):
 	return fig
 
 
-def make_race_figure(race_res):
+def make_race_figure(race_res, age_at_donation=40):
 	"""LE distributions by race group — one row per race, donor vs non-donor."""
 	TEAL  = "#1D9E75"
 	CORAL = "#D85A30"
@@ -806,7 +819,7 @@ def make_race_figure(race_res):
 
 	for ax, label in zip(axes, labels):
 		res  = race_res[label]
-		bins = np.arange(0, MAX_AGE - 40 + 2, 2)
+		bins = np.arange(0, MAX_AGE - age_at_donation + 2, 2)
 		ax.hist(res["ly_nondonor"], bins=bins, density=True,
 				color=TEAL,  alpha=0.55,
 				label=f"Non-donor  μ={res['le_nondonor']:.1f} yr")
@@ -818,7 +831,7 @@ def make_race_figure(race_res):
 		diff_d = res["diff"] * 365.25
 		ax.set_title(f"{label}\nΔLE = {diff_d:+.1f} days",
 					 fontsize=10, fontweight="bold", color="#2C2C2A")
-		ax.set_xlabel("Remaining life-years from age 40", fontsize=9)
+		ax.set_xlabel(f"Remaining life-years from age {age_at_donation}", fontsize=9)
 		ax.set_ylabel("Density", fontsize=9)
 		ax.legend(fontsize=8, frameon=False)
 		ax.set_facecolor(LIGHT)
@@ -827,7 +840,7 @@ def make_race_figure(race_res):
 		ax.tick_params(colors="#5F5E5A", labelsize=9)
 
 	plt.suptitle(
-		"Living Kidney Donation — ΔLE by Race (age 40)\n"
+		f"Living Kidney Donation — ΔLE by Race (age {age_at_donation})\n"
 		"Donor vs Matched Non-Donor Life Expectancy",
 		fontsize=12, fontweight="bold", color="#2C2C2A", y=1.02)
 	plt.tight_layout()
@@ -835,16 +848,14 @@ def make_race_figure(race_res):
 
 
 def make_sex_figure(sex_res):
-	"""Bar chart of ΔLE by sex — cohort simulation means, styled like panel D."""
+	"""Bar chart of ΔLE by sex — analytic cohort Markov, styled like panel D."""
 	TEAL  = "#1D9E75"
 	CORAL = "#D85A30"
 	LIGHT = "#F1EFE8"
 	GRAY  = "#888780"
 
 	labels = list(sex_res.keys())
-	# Use cohort simulation means, not the analytic diff
-	diffs  = [(sex_res[s]["le_donor"] - sex_res[s]["le_nondonor"]) * 365.25
-			  for s in labels]
+	diffs  = [sex_res[s]["diff"] * 365.25 for s in labels]
 	colors = [TEAL if d >= 0 else CORAL for d in diffs]
 
 	fig, ax = plt.subplots(figsize=(6, 4))
@@ -862,7 +873,7 @@ def make_sex_figure(sex_res):
 	ax.tick_params(colors="#5F5E5A", labelsize=9)
 	ax.set_title(
 		"ΔLE by sex at donation (age 40)\n"
-		"Cohort Markov simulation  |  donor vs matched non-donor",
+		"Analytic cohort Markov  |  donor vs matched non-donor",
 		fontsize=10, fontweight="bold", color="#2C2C2A", pad=8)
 
 	fig.tight_layout()
@@ -899,12 +910,14 @@ def make_age_race_matrix():
 	for r, race in enumerate(races):
 		p = BASE.copy()
 		p.update(race_params[race])
-		base_donor = p["esrd_15yr_donor_overall"]
+		base_donor    = p["esrd_15yr_donor_overall"]
+		base_nondonor = p["esrd_15yr_nondonor"]
 		for a, age in enumerate(ages):
 			if race != "Black":
 				p["esrd_15yr_donor_overall"] = _age_adjust_esrd_nonblack(base_donor, age)
 			else:
 				p["esrd_15yr_donor_overall"] = base_donor
+			p["esrd_15yr_nondonor"] = _age_adjust_esrd_nondonor(base_nondonor, age)
 			le_d  = run_arm_analytic(p, age, donor=True)
 			le_nd = run_arm_analytic(p, age, donor=False)
 			matrix[r, a] = (le_d - le_nd) * 365.25
@@ -985,9 +998,11 @@ def make_age_sex_matrix():
 		overrides = {k: v for k, v in spec.items() if k != "_lt"}
 		p = BASE.copy()
 		p.update(overrides)
-		base_donor = p["esrd_15yr_donor_overall"]
+		base_donor    = p["esrd_15yr_donor_overall"]
+		base_nondonor = p["esrd_15yr_nondonor"]
 		for a, age in enumerate(ages):
 			p["esrd_15yr_donor_overall"] = _age_adjust_esrd_nonblack(base_donor, age)
+			p["esrd_15yr_nondonor"]      = _age_adjust_esrd_nondonor(base_nondonor, age)
 			le_d  = run_arm_analytic(p, age, donor=True,  life_table=lt)
 			le_nd = run_arm_analytic(p, age, donor=False, life_table=lt)
 			matrix[s, a] = (le_d - le_nd) * 365.25
@@ -1183,9 +1198,9 @@ def make_age_race_sex_matrix():
 					p["esrd_15yr_donor_overall"] = _age_adjust_esrd_nonblack(base_donor, age)
 				else:
 					p["esrd_15yr_donor_overall"] = base_donor
-				# Grams 2016 direct non-donor baseline where published
-				p["esrd_15yr_nondonor"] = _GRAMS_NONDONOR.get(
-					(race, sex), base_nondonor)
+				# Grams 2016 reference-age (40) non-donor baseline, then age-adjusted
+				nondonor_ref = _GRAMS_NONDONOR.get((race, sex), base_nondonor)
+				p["esrd_15yr_nondonor"] = _age_adjust_esrd_nondonor(nondonor_ref, age)
 				le_d  = run_arm_analytic(p, age, donor=True,  life_table=lt)
 				le_nd = run_arm_analytic(p, age, donor=False, life_table=lt)
 				mat[r, a] = (le_d - le_nd) * 365.25
@@ -1355,7 +1370,7 @@ def main():
 	print(f"Age×race×sex matrix saved: {ars_path}")
 
 	# Save race figure
-	race_fig = make_race_figure(race_res)
+	race_fig = make_race_figure(race_res, age_at_donation=40)
 	race_fig_path = RESULTS / "kidney_model_race.png"
 	race_fig.savefig(race_fig_path, dpi=150, bbox_inches="tight",
 					 facecolor=race_fig.get_facecolor())

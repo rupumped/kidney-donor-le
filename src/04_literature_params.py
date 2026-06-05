@@ -110,6 +110,9 @@ LITERATURE_PARAMS = {
         "hr_black_race":                    2.96,   # 95% CI 2.25–3.89
         "hr_male_sex":                      1.88,   # 95% CI 1.50–2.35
         "hr_age_per_10yr_nonblack":         1.40,   # 95% CI 1.23–1.59
+        # Population ESRD incidence shows a similar age gradient for non-donors;
+        # we use the same 1.40/decade as an approximation to apply symmetrically.
+        "hr_age_per_10yr_nondonor":         1.40,
 
         # Cumulative incidence by time point (per 10,000 donors)
         "esrd_cum_incidence_5yr_per10k":    1.0,    # range 1–2

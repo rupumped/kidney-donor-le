@@ -79,6 +79,8 @@ FIG_7_17 = {
     "wl_or_tx_within_1yr_overall_2023": 0.150,  # stated in ADR text (2023)
     "wl_or_tx_within_3yr_overall":      0.200,  # read from figure bar (approximate ±2%)
     "wl_or_tx_within_5yr_overall":      0.220,  # read from figure bar (approximate ±2%)
+    # Age 18-44 1-year curve read from Figure 7.17; approximate ±3%.
+    "wl_or_tx_within_1yr_age1844_2023": 0.250,
 }
 
 # Figure 7.13: Preemptive listing (waitlisted before dialysis initiation), 2024.
@@ -162,8 +164,8 @@ _p_general = _solve_listing_prob(
 # dialysis by age at initiation; age 18-44 group ≈ 90-92% (≈ 8-10% mortality).
 # We use 10% (conservative) → survival = 0.90.
 _postdialysis_yr1_age1844 = (
-    FIG_7_17["wl_or_tx_within_1yr_overall_2023"]
-    - FIG_7_13["preemptive_listing_overall_2024"]
+    FIG_7_17["wl_or_tx_within_1yr_age1844_2023"]
+    - FIG_7_13["preemptive_listing_age1844_2024"]
 )
 _survival_yr1_donor_like = 0.90   # USRDS 2023 ADR ESRD Ch.2, age 18-44 ≈ 90-92%
 _p_donor_like_direct = _postdialysis_yr1_age1844 / _survival_yr1_donor_like
