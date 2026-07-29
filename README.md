@@ -38,9 +38,7 @@ kidney-donor-le/
 │       ├── usrds_ckd_risk_behaviors.csv
 │       ├── usrds_esrd7_params.json
 │       └── usrds_params.json
-├── paper/
-│   ├── markov_model_kidney_donation.svg   # Markov model diagram for paper
-│   └── methods.tex                        # LaTeX methods section
+├── paper/                           # LaTeX files
 ├── src/
 │   ├── 01_download_lifetables.py    # CDC NVSR 2021 US life tables
 │   ├── 02_download_usrds.py         # USRDS ADR 2025 CKD Chapter 1 (general CKD)
@@ -55,6 +53,11 @@ kidney-donor-le/
 │   ├── 06_markov_simulation.py      # Main Monte Carlo simulation (PSA + OWSA)
 │   ├── 07_cohort_markov.py          # Analytic (deterministic) cohort Markov model
 │   ├── 08_calibration.py            # Face-validity checks vs SRTR KI 22 / KI 70
+│   ├── 09_voucher_cohort_markov.py  # Voucher-holder cohort: LE benefit of priority
+│   │                                #   access for a healthy non-donor family member
+│   ├── 10_esrd_conditional_cohort_markov.py  # ESRD-conditional cohort: LE benefit
+│   │                                          #   of priority vs standard waitlist,
+│   │                                          #   conditioned on ESRD onset
 │   └── utils.py                     # Shared helpers
 ├── results/                         # Output figures and tables
 │   ├── kidney_model_results.csv          # Summary table of all analyses
@@ -70,8 +73,16 @@ kidney-donor-le/
 │   ├── kidney_model_sex_race_matrix.png  # ΔLE heat map: sex × race
 │   ├── kidney_model_race.png             # Race subgroup summary
 │   ├── kidney_model_sex.png              # Sex subgroup summary
-│   ├── cohort_markov_state_occupancy.png # State occupancy over time (cohort Markov)
-│   └── cohort_markov_survival.png        # Survival curves (cohort Markov)
+│   ├── cohort_markov_state_occupancy.png      # State occupancy over time (cohort Markov)
+│   ├── cohort_markov_survival.png             # Survival curves (cohort Markov)
+│   ├── voucher_cohort_state_occupancy.png     # State occupancy — voucher vs control
+│   ├── voucher_cohort_survival.png            # Survival curves — voucher vs control
+│   ├── voucher_cohort_owsa_tornado.png        # OWSA tornado — voucher LE benefit
+│   ├── voucher_cohort_age_sweep.png           # Voucher LE benefit by age at designation
+│   ├── esrd_conditional_state_occupancy.png   # State occupancy — priority vs standard | ESRD
+│   ├── esrd_conditional_survival.png          # Survival from ESRD onset
+│   ├── esrd_conditional_owsa_tornado.png      # OWSA tornado — priority waitlist LE benefit | ESRD
+│   └── esrd_conditional_age_sweep.png         # Priority waitlist benefit by age at ESRD onset
 └── tests/
     └── test_model.py               # Validation checks
 ```
@@ -115,6 +126,8 @@ python src/05_assemble_parameters.py
 python src/06_markov_simulation.py      # Monte Carlo (PSA + OWSA + subgroups)
 python src/07_cohort_markov.py          # Analytic cohort Markov (optional, --age N)
 python src/08_calibration.py            # Face-validity checks vs SRTR KI 22 / KI 70
+python src/09_voucher_cohort_markov.py  # Voucher-holder LE benefit (optional, --age N)
+python src/10_esrd_conditional_cohort_markov.py  # Priority benefit | ESRD (optional, --age N)
 
 # Results appear in results/
 ```
