@@ -1,0 +1,127 @@
+<svg width="100%" viewBox="0 -30 680 655" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>Markov model: living kidney donation health states</title>
+<desc>Seven health states (healthy post-donation, ESRD onset, dialysis, standard waitlist, priority waitlist, post-transplant, death). L-shaped arrows from ESRD to the top of the waitlist boxes represent preemptive listing that bypasses dialysis. Diagonal arrows from Dialysis to the waitlists represent post-dialysis listing. Graft failure returns post-transplant patients to dialysis.</desc>
+
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+
+<!-- === STATES === -->
+
+<!-- Healthy post-donation -->
+<rect x="240" y="-5" width="200" height="56" rx="8" stroke-width="0.5" style="fill:rgb(8,80,65);stroke:rgb(93,202,165);"/>
+<text x="340" y="19" text-anchor="middle" dominant-baseline="central" style="fill:rgb(159,225,203);font-size:14px;font-weight:500;">Healthy</text>
+<text x="340" y="37" text-anchor="middle" dominant-baseline="central" style="fill:rgb(93,202,165);font-size:12px;">Reference state</text>
+
+<!-- ESRD onset -->
+<rect x="240" y="115" width="200" height="56" rx="8" stroke-width="0.5" style="fill:rgb(113,43,19);stroke:rgb(240,153,123);"/>
+<text x="340" y="137" text-anchor="middle" dominant-baseline="central" style="fill:rgb(245,196,179);font-size:14px;font-weight:500;">ESRD</text>
+<text x="340" y="155" text-anchor="middle" dominant-baseline="central" style="fill:rgb(240,153,123);font-size:12px;">End-Stage Renal Disease</text>
+
+<!-- Dialysis (centered between the two WL boxes) -->
+<rect x="240" y="228" width="200" height="56" rx="8" stroke-width="0.5" style="fill:rgb(80,25,8);stroke:rgb(210,105,75);"/>
+<text x="340" y="250" text-anchor="middle" dominant-baseline="central" style="fill:rgb(245,196,179);font-size:14px;font-weight:500;">Dialysis</text>
+<text x="340" y="268" text-anchor="middle" dominant-baseline="central" style="fill:rgb(210,105,75);font-size:12px;">If not pre-emptively listed</text>
+
+<!-- Standard waitlist -->
+<rect x="30" y="353" width="200" height="56" rx="8" stroke-width="0.5" style="fill:rgb(99,56,6);stroke:rgb(239,159,39);"/>
+<text x="130" y="375" text-anchor="middle" dominant-baseline="central" style="fill:rgb(250,199,117);font-size:14px;font-weight:500;">Standard waitlist</text>
+<text x="130" y="393" text-anchor="middle" dominant-baseline="central" style="fill:rgb(239,159,39);font-size:12px;">985 days median wait (post-KAS250)</text>
+
+<!-- Priority waitlist -->
+<rect x="450" y="353" width="200" height="56" rx="8" stroke-width="0.5" style="fill:rgb(60,52,137);stroke:rgb(175,169,236);"/>
+<text x="550" y="375" text-anchor="middle" dominant-baseline="central" style="fill:rgb(206,203,246);font-size:14px;font-weight:500;">Priority waitlist</text>
+<text x="550" y="393" text-anchor="middle" dominant-baseline="central" style="fill:rgb(175,169,236);font-size:12px;">103 days median wait</text>
+
+<!-- Post-transplant -->
+<rect x="240" y="470" width="200" height="56" rx="8" stroke-width="0.5" style="fill:rgb(12,68,124);stroke:rgb(133,183,235);"/>
+<text x="340" y="492" text-anchor="middle" dominant-baseline="central" style="fill:rgb(181,212,244);font-size:14px;font-weight:500;">Post-transplant</text>
+<text x="340" y="510" text-anchor="middle" dominant-baseline="central" style="fill:rgb(133,183,235);font-size:12px;">Improved survival vs dialysis</text>
+
+<!-- === TRANSITIONS === -->
+
+<!-- (1) Healthy → ESRD -->
+<path d="M340 51 L340 115" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" marker-end="url(#arrow)" opacity="0.6"/>
+<text x="348" y="73" dominant-baseline="central" opacity="0.65" style="fill:rgb(194,192,182);font-size:10px;">Donor: 0.31% cumul./15yr</text>
+<text x="348" y="85" dominant-baseline="central" opacity="0.65" style="fill:rgb(194,192,182);font-size:10px;">Control: 0.039% cumul./15yr</text>
+<text x="348" y="97" dominant-baseline="central" opacity="0.5" style="fill:rgb(160,158,148);font-size:9px;">Muzaale 2014 JAMA; Grams 2016 NEJM</text>
+
+<!-- (2) Healthy → Death (background mortality, dashed stub left) -->
+<path d="M240 23 L196 23" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" stroke-dasharray="4 3" marker-end="url(#arrow)" opacity="0.4"/>
+<text x="192" y="14" text-anchor="end" dominant-baseline="central" opacity="0.5" style="fill:rgb(194,192,182);font-size:10px;">Background mortality</text>
+<text x="192" y="26" text-anchor="end" dominant-baseline="central" opacity="0.4" style="fill:rgb(160,158,148);font-size:9px;">HR=1.0 (base) · CDC 2021</text>
+
+<!-- (3) ESRD → Dialysis (majority path, straight down) -->
+<path d="M340 171 L340 228" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" marker-end="url(#arrow)" opacity="0.6"/>
+<text x="347" y="193" dominant-baseline="central" opacity="0.65" style="fill:rgb(194,192,182);font-size:10px;">~91–94% start dialysis</text>
+<text x="347" y="205" dominant-baseline="central" opacity="0.5" style="fill:rgb(160,158,148);font-size:9px;">USRDS 2025 Fig. 7.13</text>
+
+<!-- (4) ESRD → Standard WL (preemptive: left 40px toward outer corner, then down to box top) -->
+<path d="M240 143 L90 143 L90 353" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" marker-end="url(#arrow)" opacity="0.6"/>
+<text x="98" y="215" dominant-baseline="central" opacity="0.7" style="fill:rgb(194,192,182);font-size:12px;">Non-donor</text>
+<text x="98" y="228" dominant-baseline="central" opacity="0.65" style="fill:rgb(194,192,182);font-size:10px;">~6% preemptive</text>
+<text x="98" y="239" dominant-baseline="central" opacity="0.5" style="fill:rgb(160,158,148);font-size:9px;">USRDS 2025 Fig. 7.13</text>
+
+<!-- (5) ESRD → Priority WL (preemptive: right 40px toward outer corner, then down to box top) -->
+<path d="M440 143 L590 143 L590 353" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" marker-end="url(#arrow)" opacity="0.6"/>
+<text x="582" y="215" text-anchor="end" dominant-baseline="central" opacity="0.7" style="fill:rgb(194,192,182);font-size:12px;">Prior donor</text>
+<text x="582" y="228" text-anchor="end" dominant-baseline="central" opacity="0.65" style="fill:rgb(194,192,182);font-size:10px;">~9% preemptive</text>
+<text x="582" y="239" text-anchor="end" dominant-baseline="central" opacity="0.5" style="fill:rgb(160,158,148);font-size:9px;">USRDS 2025 Fig. 7.13</text>
+
+<!-- (6) Dialysis → Standard WL (post-dialysis listing, diagonal) -->
+<path d="M242 284 L182 353" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" marker-end="url(#arrow)" opacity="0.6"/>
+<text x="203" y="298" text-anchor="end" dominant-baseline="central" opacity="0.7" style="fill:rgb(194,192,182);font-size:12px;">Non-donor</text>
+<text x="203" y="311" text-anchor="end" dominant-baseline="central" opacity="0.65" style="fill:rgb(194,192,182);font-size:10px;">~15%/yr listed</text>
+<text x="203" y="322" text-anchor="end" dominant-baseline="central" opacity="0.5" style="fill:rgb(160,158,148);font-size:9px;">USRDS 2025 Fig. 7.15</text>
+
+<!-- (7) Dialysis → Priority WL (post-dialysis listing, diagonal) -->
+<path d="M438 284 L498 353" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" marker-end="url(#arrow)" opacity="0.6"/>
+<text x="475" y="298" dominant-baseline="central" opacity="0.7" style="fill:rgb(194,192,182);font-size:12px;">Prior donor</text>
+<text x="475" y="311" dominant-baseline="central" opacity="0.65" style="fill:rgb(194,192,182);font-size:10px;">~15%/yr listed</text>
+<text x="475" y="322" dominant-baseline="central" opacity="0.5" style="fill:rgb(160,158,148);font-size:9px;">USRDS 2025 Fig. 7.15</text>
+
+<!-- (8) Dialysis → Death (mortality, dashed stub down) -->
+<path d="M340 284 L340 314" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" stroke-dasharray="4 3" marker-end="url(#arrow)" opacity="0.35"/>
+<text x="347" y="294" dominant-baseline="central" opacity="0.55" style="fill:rgb(194,192,182);font-size:10px;">22%/yr (yr 1), 17%/yr+</text>
+<text x="347" y="306" dominant-baseline="central" opacity="0.45" style="fill:rgb(160,158,148);font-size:9px;">USRDS 2023/2024 ADR</text>
+
+<!-- (9) Standard WL → Post-transplant -->
+<path d="M230 381 C270 381 265 440 265 470" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" marker-end="url(#arrow)" opacity="0.6"/>
+<text x="255" y="427" text-anchor="end" dominant-baseline="central" opacity="0.65" style="fill:rgb(194,192,182);font-size:10px;">~23%/yr transplanted</text>
+<text x="255" y="439" text-anchor="end" dominant-baseline="central" opacity="0.5" style="fill:rgb(160,158,148);font-size:9px;">985-day median · SRTR 2023</text>
+
+<!-- (10) Priority WL → Post-transplant -->
+<path d="M450 381 C410 381 415 440 415 470" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" marker-end="url(#arrow)" opacity="0.6"/>
+<text x="425" y="427" dominant-baseline="central" opacity="0.65" style="fill:rgb(194,192,182);font-size:10px;">~92%/yr transplanted</text>
+<text x="425" y="439" dominant-baseline="central" opacity="0.5" style="fill:rgb(160,158,148);font-size:9px;">103-day median · Wainright 2017</text>
+
+<!-- (11) Standard WL → Death (dashed stub down) -->
+<path d="M94 409 L94 449" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" stroke-dasharray="4 3" marker-end="url(#arrow)" opacity="0.4"/>
+<text x="90" y="427" text-anchor="end" dominant-baseline="central" opacity="0.5" style="fill:rgb(194,192,182);font-size:10px;">5.0/100 PY</text>
+<text x="90" y="439" text-anchor="end" dominant-baseline="central" opacity="0.4" style="fill:rgb(160,158,148);font-size:9px;">SRTR 2023 ADR</text>
+
+<!-- (12) Priority WL → Death (dashed stub down) -->
+<path d="M586 409 L586 449" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" stroke-dasharray="4 3" marker-end="url(#arrow)" opacity="0.4"/>
+<text x="590" y="427" dominant-baseline="central" opacity="0.5" style="fill:rgb(194,192,182);font-size:10px;">5.0/100 PY</text>
+<text x="590" y="439" dominant-baseline="central" opacity="0.4" style="fill:rgb(160,158,148);font-size:9px;">SRTR 2023 ADR</text>
+
+<!-- (13) Post-transplant → Death (dashed stub down) -->
+<path d="M340 526 L340 550" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" stroke-dasharray="4 3" marker-end="url(#arrow)" opacity="0.4"/>
+<text x="347" y="533" dominant-baseline="central" opacity="0.5" style="fill:rgb(194,192,182);font-size:10px;">3.5%/yr (age-stratified)</text>
+<text x="347" y="544" dominant-baseline="central" opacity="0.4" style="fill:rgb(160,158,148);font-size:9px;">SRTR 2023 DDKT patient survival</text>
+
+<!-- (14) Post-transplant → Dialysis (graft failure — returns to Dialysis, not ESRD) -->
+<path d="M320 470 L320 284" fill="none" stroke="rgb(156,154,146)" stroke-width="0.8" marker-end="url(#arrow)" opacity="0.6"/>
+<text x="325" y="384" text-anchor="start" dominant-baseline="central" opacity="0.65" style="fill:rgb(194,192,182);font-size:10px;">Graft failure</text>
+<text x="325" y="396" text-anchor="start" dominant-baseline="central" opacity="0.65" style="fill:rgb(194,192,182);font-size:10px;">~2.5%/yr</text>
+<text x="325" y="407" text-anchor="start" dominant-baseline="central" opacity="0.45" style="fill:rgb(160,158,148);font-size:9px;">SRTR 2023</text>
+
+<!-- Legend -->
+<line x1="173" y1="580" x2="198" y2="580" stroke="rgb(156,154,146)" stroke-width="0.8" opacity="0.6" marker-end="url(#arrow)"/>
+<text x="205" y="580" dominant-baseline="central" opacity="0.8" style="fill:rgb(194,192,182);font-size:12px;">State transition</text>
+<line x1="357" y1="580" x2="382" y2="580" stroke="rgb(156,154,146)" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.6" marker-end="url(#arrow)"/>
+<text x="389" y="580" dominant-baseline="central" opacity="0.8" style="fill:rgb(194,192,182);font-size:12px;">Mortality pathway</text>
+
+</svg>
