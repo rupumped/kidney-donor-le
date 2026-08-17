@@ -73,6 +73,42 @@ The PSA (200~parameter draws) produced a mean $\Delta\text{LE}$ of $+29.5$~days 
 \subsection{One-way sensitivity analysis}
 \label{sec:owsa}
 
+\begin{table*}[t]
+	\centering
+	\caption{\textbf{One-way sensitivity analysis:} parameter values tested and the resulting change in life expectancy (donor arm minus non-donor arm), age~40 at donation, all other parameters held at base-case values. Negative $\Delta$LE values indicate a net life-expectancy cost of donation relative to the matched non-donor arm under the value tested; positive values indicate a donor-arm benefit. The ``$8\times$ controls (base case)'' row reproduces the overall base-case result reported in the main results table ($\Delta$LE~$=-37.0$~d).}
+	\label{tab:owsa}
+	\begin{tabular}{lrr}
+	\hline
+	Parameter (value tested) & $\Delta$LE (days) & vs.\ base (days) \\
+	\hline
+	\multicolumn{3}{l}{\textit{ESRD relative risk, donor vs.\ non-donor (base case: $8\times$, 30.8/10{,}000)}} \\
+	\quad $2\times$ controls & $-5.1$ & $+31.9$ \\
+	\quad $4\times$ controls & $-15.9$ & $+21.1$ \\
+	\quad $8\times$ controls (base case) & $-37.0$ & — \\
+	\quad $11\times$ controls (Mjøen upper bound) & $-53.7$ & $-16.7$ \\
+	\hline
+	\multicolumn{3}{l}{\textit{Standard waitlist median wait (base case: 985~d)}} \\
+	\quad 24 months (730~d) & $-37.0$ & $+0.0$ \\
+	\quad 58 months (1760~d, pre-KAS250) & $-36.8$ & $+0.2$ \\
+	\hline
+	\multicolumn{3}{l}{\textit{Priority (PLD) waitlist median wait (base case: 102.6~d)}} \\
+	\quad 50~d (optimistic) & $-36.9$ & $+0.1$ \\
+	\quad 200~d & $-37.2$ & $-0.2$ \\
+	\quad No priority access (985~d) & $-38.9$ & $-1.9$ \\
+	\hline
+	\multicolumn{3}{l}{\textit{Dialysis annual mortality (base case: 17\%)}} \\
+	\quad $-50\%$ (8.5\%) & $-24.6$ & $+12.4$ \\
+	\quad $+50\%$ (25.5\%) & $-43.9$ & $-6.9$ \\
+	\hline
+	\multicolumn{3}{l}{\textit{Donor all-cause mortality HR (base case: 1.0)}} \\
+	\quad HR~=~1.30 (Mjøen pessimistic) & $-1067.9$ & $-1030.9$ \\
+	\hline
+	\multicolumn{3}{l}{\textit{Post-transplant survival (base case: DDKT quality)}} \\
+	\quad LDKT quality (SRTR Figure~KI~76) & $-22.7$ & $+14.3$ \\
+	\hline
+	\end{tabular}
+\end{table*}
+
 The donor all-cause mortality hazard ratio dominated all other parameters by an order of magnitude (Table~\ref{tab:owsa}, Figure~\ref{fig:tornado}). Setting HR~$= 1.30$~\cite{mjoeen_long-term_2014} increased the life-expectancy cost to $-1{,}067.9$~days, a swing of more than 1,000~days from base case. No other parameter produced a swing exceeding 32~days. Dialysis mortality ($\pm 50\%$) shifted $\Delta$LE by at most $\pm 12$~days. Variation in the standard waitlist wait time across the plausible range (730--1,760~days) altered $\Delta$LE by less than 0.2~days.
 
 The priority waitlist had similarly negligible influence: removing PLD priority access entirely --- setting the donor waitlist to the standard 985-day median --- worsened $\Delta$LE by only 1.9~days relative to base case. Halving the priority wait to 50~days recovered only 0.1~days. This insensitivity arises because fewer than 0.3\% of donors develop ESRD within 15~years and fewer still ever reach the transplant waitlist; the priority pathway is simply too rarely invoked to move a population-level outcome meaningfully.
