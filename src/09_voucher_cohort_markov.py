@@ -6,7 +6,7 @@ kidney-donation "voucher" held by a healthy, non-donor family member.
 
 Background: Living kidney donors can designate non-donor family members to
 receive a voucher granting them the same priority waitlist access as prior
-living donors (PLD) — approximately 100-day median wait vs 985 days on the
+living donors (PLD) — approximately 100-day median wait vs 1,765 days on the
 standard deceased-donor waitlist — should those family members ever develop
 ESRD and need a transplant.
 
@@ -93,6 +93,15 @@ def _ptx_mort(p: dict, age: int, ldkt: bool = False) -> float:
     else:          return float(p.get(f"{prefix}annual_mort_age65p",  fallback))
 
 
+def _graft_fail_rate(p: dict, age: int) -> float:
+    """Age-stratified post-year-1 graft failure (SRTR 2023 ADR Figure KI 53)."""
+    base = p.get("graft_annual_fail_postyear1", 0.025)
+    if age < 35:   return float(p.get("graft_annual_fail_postyear1_age1834", base))
+    elif age < 50: return float(p.get("graft_annual_fail_postyear1_age3549", base))
+    elif age < 65: return float(p.get("graft_annual_fail_postyear1_age5064", base))
+    else:          return float(p.get("graft_annual_fail_postyear1_age65p",  base))
+
+
 def _wl_mort(p: dict) -> float:
     return float(1.0 - np.exp(-p["wl_mort_per_100py"] / 100))
 
@@ -114,7 +123,7 @@ def run_arm(p: dict, n: float, age_at_entry: int, voucher: bool,
         Age at cohort entry (years).
     voucher : bool
         True  → priority waitlist (~100-day median) upon ESRD onset.
-        False → standard waitlist (~985-day median) upon ESRD onset.
+        False → standard waitlist (~1,765-day median) upon ESRD onset.
     esrd_cum_risk_15 : float, optional
         15-year competing-risk ESRD CIF. Defaults to non-donor overall.
     ldkt : bool
@@ -138,7 +147,6 @@ def run_arm(p: dict, n: float, age_at_entry: int, voucher: bool,
     wl_listing = float(p.get("wl_listing_prob", 0.15))
     dial_mort1 = float(p["dialysis_1yr_mort"])
     dial_mort  = float(p["dialysis_annual_mort"])
-    graft_fail = float(p.get("graft_annual_fail_postyear1", 0.025))
 
     # Voucher holders are part of the living-donation ecosystem; they're informed
     # and monitored, making preemptive listing more likely (base: 9.4%, same as
@@ -170,6 +178,7 @@ def run_arm(p: dict, n: float, age_at_entry: int, voucher: bool,
         q_bg  = lt[min(age, MAX_AGE)]          # background mortality (HR=1.0 both arms)
         p_esrd = weibull_annual_prob(float(yr), wbl_lam, wbl_k)
         ptx_m  = _ptx_mort(p, age, ldkt=ldkt)
+        graft_fail = _graft_fail_rate(p, age)
 
         # H (Healthy)
         H_die        = H * q_bg
@@ -436,7 +445,8 @@ def main(age_at_entry: int = 40, n: int = N_PER_ARM):
         ),
         (
             "Standard wait time (days)",
-            {"wl_std_median_days": 750.0}, {"wl_std_median_days": 1200.0},
+            # Range = post-KAS250 SWT/LWT center means (Punjala 2024 Table 4)
+            {"wl_std_median_days": 1491.0}, {"wl_std_median_days": 2100.0},
             False, False,
         ),
         (

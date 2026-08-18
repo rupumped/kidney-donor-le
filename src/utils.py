@@ -68,7 +68,7 @@ def _hardcoded_base_params() -> dict:
 
     Sources documented inline — see README and src/04_literature_params.py.
     """
-    return {
+    params = {
         # ── ESRD RISK ─────────────────────────────────────────────────────
         # Muzaale 2014, JAMA 311:579 (Table 2 / PMC full text)
         "esrd_15yr_donor_overall":  0.0031,   # 30.8/10,000 at 15 yr
@@ -101,8 +101,9 @@ def _hardcoded_base_params() -> dict:
         "wl_mort_black_per_100py":  4.62,   # SRTR 2023 Figure KI 25
         "wl_mort_white_per_100py":  5.71,
 
-        # SRTR 2023 ADR / Schold AJT 2023 — post-KAS250 (March 2021)
-        "wl_std_median_days":       985,    # ~32.8 months overall
+        # Punjala 2024 (Transplant Proc 56:1740-1751), Table 3 — national mean
+        # waiting time at transplant, post-KAS250 (5/2021-4/2022)
+        "wl_std_median_days":       1765,   # 58 months overall
         # Wainright 2017 AJT 17:1103 + UNOS conference abstract
         "wl_pld_median_days":       102.6,  # prior living donors post-KAS
 
@@ -134,8 +135,14 @@ def _hardcoded_base_params() -> dict:
         "posttx_annual_mort_black": 0.035,  # SRTR 2023 DDKT race-stratified
         "posttx_annual_mort_white": 0.038,
 
-        # Annual graft failure rate post year-1 (SRTR 2023)
-        "graft_annual_fail_postyear1": 0.025,
+        # DDKT 5-yr graft survival by age (SRTR 2023 ADR Figure KI 53) and an
+        # assumed national 1-yr graft survival, used below to derive
+        # age-stratified post-year-1 graft failure.
+        "ddkt_graft_5yr_age1834": 0.822,
+        "ddkt_graft_5yr_age3549": 0.835,
+        "ddkt_graft_5yr_age5064": 0.768,
+        "ddkt_graft_5yr_age65p":  0.661,
+        "ddkt_graft_1yr_assumed": 0.955,
 
         # ── POST-TRANSPLANT OUTCOMES (LDKT) ───────────────────────────────
         # SRTR 2023 ADR Figure KI 76 — LDKT patient survival by recipient age
@@ -163,6 +170,20 @@ def _hardcoded_base_params() -> dict:
         "esrd_preemptive_prob_std": 0.058,   # 5.8% overall (non-donor standard arm)
         "esrd_preemptive_prob_pld": 0.094,   # 9.4% age 18-44 (donor-like cohort)
     }
+
+    # Age-stratified post-year-1 graft failure, derived as
+    # 1 - (5yr_surv / 1yr_surv)^(1/4) from the DDKT graft survival above
+    # (see src/03_download_srtr.py for the ADR-Excel-sourced version). A flat
+    # rate cannot represent this: the four bands span roughly 3.3%-8.8%/yr.
+    for _band in ("age1834", "age3549", "age5064", "age65p"):
+        params[f"graft_annual_fail_postyear1_{_band}"] = round(
+            1 - (params[f"ddkt_graft_5yr_{_band}"]
+                 / params["ddkt_graft_1yr_assumed"]) ** 0.25, 4)
+    params["graft_annual_fail_postyear1"] = round(sum(
+        params[f"graft_annual_fail_postyear1_{_b}"]
+        for _b in ("age1834", "age3549", "age5064", "age65p")) / 4, 4)
+
+    return params
 
 
 # ── STATISTICAL HELPERS ───────────────────────────────────────────────────────

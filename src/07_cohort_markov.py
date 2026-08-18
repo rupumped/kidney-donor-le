@@ -62,6 +62,15 @@ def _ptx_mort(p, age: int) -> float:
     else:          return float(p.get("posttx_annual_mort_age65p",  p["posttx_annual_mort"]))
 
 
+def _graft_fail_rate(p, age: int) -> float:
+    """Age-stratified post-year-1 graft failure (SRTR 2023 ADR Figure KI 53)."""
+    base = p.get("graft_annual_fail_postyear1", 0.025)
+    if age < 35:   return float(p.get("graft_annual_fail_postyear1_age1834", base))
+    elif age < 50: return float(p.get("graft_annual_fail_postyear1_age3549", base))
+    elif age < 65: return float(p.get("graft_annual_fail_postyear1_age5064", base))
+    else:          return float(p.get("graft_annual_fail_postyear1_age65p",  base))
+
+
 # ── COHORT SIMULATION ─────────────────────────────────────────────────────────
 def run_arm(p, n: float, age_at_entry: int, donor: bool, life_table=None):
     """
@@ -84,7 +93,6 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool, life_table=None):
     dial_mort1   = float(p["dialysis_1yr_mort"])
     dial_mort    = float(p["dialysis_annual_mort"])
     bg_hr        = float(p.get("donor_mort_hr", 1.0)) if donor else 1.0
-    graft_fail   = float(p.get("graft_annual_fail_postyear1", 0.025))
     preemptive_p = float(p.get(
         "esrd_preemptive_prob_pld" if donor else "esrd_preemptive_prob_std", 0.0))
 
@@ -113,6 +121,7 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool, life_table=None):
         q_bg   = lt[min(age, MAX_AGE)] * bg_hr
         p_esrd = weibull_annual_prob(float(yr), wbl_lam, wbl_k)
         ptx_m  = _ptx_mort(p, age)
+        graft_fail = _graft_fail_rate(p, age)
 
         # ── H (Healthy) ───────────────────────────────────────────────────
         H_die        = H * q_bg

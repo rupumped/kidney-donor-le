@@ -16,7 +16,7 @@ conditions entirely on ESRD onset, answering:
 
 Arms:
   Priority  — priority waitlist (≈100-day median, voucher / prior-donor benefit)
-  Standard  — standard waitlist (≈985-day median)
+  Standard  — standard waitlist (≈1,765-day median)
 
 Entry state:
   All n individuals enter with newly diagnosed ESRD.
@@ -37,7 +37,7 @@ States:
 
 Sensitivity analyses:
   1. Priority wait time:      50 d / 102.6 d (base) / 200 d
-  2. Standard wait time:      750 d / 985 d (base) / 1 200 d
+  2. Standard wait time:      1 491 d / 1 765 d (base) / 2 100 d
   3. Per-cycle listing rate:  0.05 / 0.15 (base) / 0.30
   4. Preemptive listing prob: 5.8 % (standard) / 9.4 % (base, priority arm)
   5. Post-Tx quality:         DDKT (base) / LDKT
@@ -71,14 +71,15 @@ LIFE_TABLE_QX = load_life_table(_lt_path if _lt_path.exists() else None)
 # Color palette (consistent with rest of project)
 _BLUE  = "#2B6CB0"   # priority
 _GREY  = "#718096"   # standard
-_LIGHT = "#F1EFE8"
+_LIGHT = "#FFFFFF"
 _STATE_COLORS = {
     "D1": "#E87A5D",
     "D2": "#C4503A",
     "WL": "#534AB7",
     "PT": "#BA7517",
 }
-
+FS_LABEL=14
+FS_TICK=13
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def _ptx_mort(p: dict, age: int, ldkt: bool = False) -> float:
@@ -90,6 +91,15 @@ def _ptx_mort(p: dict, age: int, ldkt: bool = False) -> float:
     elif age < 50: return float(p.get(f"{prefix}annual_mort_age3549", fallback))
     elif age < 65: return float(p.get(f"{prefix}annual_mort_age5064", fallback))
     else:          return float(p.get(f"{prefix}annual_mort_age65p",  fallback))
+
+
+def _graft_fail_rate(p: dict, age: int) -> float:
+    """Age-stratified post-year-1 graft failure (SRTR 2023 ADR Figure KI 53)."""
+    base = p.get("graft_annual_fail_postyear1", 0.025)
+    if age < 35:   return float(p.get("graft_annual_fail_postyear1_age1834", base))
+    elif age < 50: return float(p.get("graft_annual_fail_postyear1_age3549", base))
+    elif age < 65: return float(p.get("graft_annual_fail_postyear1_age5064", base))
+    else:          return float(p.get("graft_annual_fail_postyear1_age65p",  base))
 
 
 # ── COHORT SIMULATION ─────────────────────────────────────────────────────────
@@ -108,7 +118,7 @@ def run_arm(p: dict, n: float, age_at_esrd: int, priority: bool,
         Age at ESRD onset / cohort entry.
     priority : bool
         True  → priority waitlist (~100-day median).
-        False → standard waitlist (~985-day median).
+        False → standard waitlist (~1,765-day median).
     dial_mort_scale : float
         Multiplicative scale on both dialysis mortality rates (sensitivity).
     ldkt : bool
@@ -130,7 +140,6 @@ def run_arm(p: dict, n: float, age_at_esrd: int, priority: bool,
     wl_listing = float(p.get("wl_listing_prob", 0.15))
     dial_mort1 = float(p["dialysis_1yr_mort"])  * dial_mort_scale
     dial_mort  = float(p["dialysis_annual_mort"]) * dial_mort_scale
-    graft_fail = float(p.get("graft_annual_fail_postyear1", 0.025))
 
     # Preemptive listing: fraction of ESRD-onset patients listed before dialysis.
     # Priority arm uses the donor-like (informed) rate; standard arm uses the
@@ -153,6 +162,7 @@ def run_arm(p: dict, n: float, age_at_esrd: int, priority: bool,
     while D1 + D2 + WL + PT > 0.5:
         age   = age_at_esrd + yr
         ptx_m = _ptx_mort(p, age, ldkt=ldkt)
+        graft_fail = _graft_fail_rate(p, age)
 
         # ── D1 (ESRD year 1) — all survivors leave D1 after one cycle ────────
         D1_die    = D1 * dial_mort1
@@ -207,7 +217,7 @@ def run_arm(p: dict, n: float, age_at_esrd: int, priority: bool,
 def make_fig_state_occupancy(trace_p, trace_s, n, age_at_esrd):
     """Fraction of cohort in each state over time."""
     fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)
-    fig.patch.set_facecolor("#FAFAF8")
+    fig.patch.set_facecolor(_LIGHT)
 
     for ax, trace, title in zip(
         axes, [trace_p, trace_s],
@@ -221,15 +231,15 @@ def make_fig_state_occupancy(trace_p, trace_s, n, age_at_esrd):
         ax.spines[["top", "right"]].set_visible(False)
         ax.spines[["left", "bottom"]].set_color("#B4B2A9")
         ax.tick_params(colors="#5F5E5A", labelsize=9)
-        ax.set_xlabel("Age", fontsize=9)
-        ax.set_ylabel("Fraction of cohort", fontsize=9)
-        ax.set_title(title, fontsize=11, fontweight="bold", color="#2C2C2A")
-        ax.legend(fontsize=9, frameon=False)
+        ax.set_xlabel("Age", fontsize=FS_LABEL)
+        ax.set_ylabel("Fraction of cohort", fontsize=FS_LABEL)
+        # ax.set_title(title, fontsize=11, fontweight="bold", color="#2C2C2A")
+        ax.legend(fontsize=FS_LABEL, frameon=False)
 
-    fig.suptitle(
-        "State occupancy — ESRD-conditional cohort Markov",
-        fontsize=12, fontweight="bold", color="#2C2C2A"
-    )
+    # fig.suptitle(
+    #     "State occupancy — ESRD-conditional cohort Markov",
+    #     fontsize=12, fontweight="bold", color="#2C2C2A"
+    # )
     fig.tight_layout()
     return fig
 
@@ -237,7 +247,7 @@ def make_fig_state_occupancy(trace_p, trace_s, n, age_at_esrd):
 def make_fig_survival(trace_p, trace_s, n, age_at_esrd):
     """Survival curves from ESRD onset."""
     fig, ax = plt.subplots(figsize=(8, 5))
-    fig.patch.set_facecolor("#FAFAF8")
+    fig.patch.set_facecolor(_LIGHT)
     ax.set_facecolor(_LIGHT)
 
     # Cycle 0: full cohort alive (before any transitions)
@@ -248,15 +258,14 @@ def make_fig_survival(trace_p, trace_s, n, age_at_esrd):
 
     ax.plot(ages_p, surv_p, color=_BLUE, lw=2.0, label="Priority (voucher / prior donor)")
     ax.plot(ages_s, surv_s, color=_GREY, lw=2.0, label="Standard", linestyle="--")
-    ax.legend(fontsize=10, frameon=False)
-    ax.set_xlabel("Age", fontsize=10)
-    ax.set_ylabel("Survival fraction", fontsize=10)
+    ax.legend(fontsize=FS_LABEL, frameon=False)
+    ax.set_xlabel("Age", fontsize=FS_LABEL)
+    ax.set_ylabel("Survival fraction", fontsize=FS_LABEL)
     ax.set_ylim(0, 1)
     ax.spines[["top", "right"]].set_visible(False)
     ax.spines[["left", "bottom"]].set_color("#B4B2A9")
-    ax.tick_params(colors="#5F5E5A", labelsize=9)
-    ax.set_title("Survival from ESRD onset — priority vs standard waitlist",
-                 fontsize=12, fontweight="bold", color="#2C2C2A")
+    ax.tick_params(colors="#5F5E5A", labelsize=FS_TICK)
+    # ax.set_title("Survival from ESRD onset — priority vs standard waitlist", fontsize=12, fontweight="bold", color="#2C2C2A")
     fig.tight_layout()
     return fig
 
@@ -274,7 +283,7 @@ def make_fig_tornado(owsa_results, base_diff_days):
     highs  = [highs[i]  for i in order]
 
     fig, ax = plt.subplots(figsize=(10, max(4, len(labels) * 0.6 + 1.5)))
-    fig.patch.set_facecolor("#FAFAF8")
+    fig.patch.set_facecolor(_LIGHT)
     ax.set_facecolor(_LIGHT)
 
     y_pos = np.arange(len(labels))
@@ -284,13 +293,13 @@ def make_fig_tornado(owsa_results, base_diff_days):
 
     ax.axvline(0, color="#2C2C2A", lw=1.2)
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(labels, fontsize=9)
-    ax.set_xlabel("Change in ΔLE from base case (days)", fontsize=10)
-    ax.set_title(
-        f"One-way sensitivity — priority vs standard waitlist LE benefit\n"
-        f"(base ΔLE = +{base_diff_days:.1f} days, conditional on ESRD)",
-        fontsize=11, fontweight="bold", color="#2C2C2A"
-    )
+    ax.set_yticklabels(labels, fontsize=FS_TICK)
+    ax.set_xlabel("Change in ΔLE from base case (days)", fontsize=FS_LABEL)
+    # ax.set_title(
+    #     f"One-way sensitivity — priority vs standard waitlist LE benefit\n"
+    #     f"(base ΔLE = +{base_diff_days:.1f} days, conditional on ESRD)",
+    #     fontsize=11, fontweight="bold", color="#2C2C2A"
+    # )
     ax.spines[["top", "right"]].set_visible(False)
     ax.spines[["left", "bottom"]].set_color("#B4B2A9")
     ax.tick_params(colors="#5F5E5A", labelsize=9)
@@ -304,7 +313,7 @@ def make_fig_age_sweep(age_results):
     diffs = [r["diff_days"] for r in age_results]
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    fig.patch.set_facecolor("#FAFAF8")
+    fig.patch.set_facecolor(_LIGHT)
     ax.set_facecolor(_LIGHT)
 
     ax.plot(ages, diffs, color=_BLUE, lw=2.2, marker="o", markersize=6)
@@ -312,18 +321,18 @@ def make_fig_age_sweep(age_results):
 
     for age, d in zip(ages, diffs):
         ax.annotate(f"+{d:.0f}d", xy=(age, d), xytext=(2, 6),
-                    textcoords="offset points", fontsize=8, color="#2C2C2A")
+                    textcoords="offset points", fontsize=FS_TICK, color="#2C2C2A")
 
-    ax.set_xlabel("Age at ESRD onset", fontsize=10)
-    ax.set_ylabel("LE benefit of priority waitlist (days)", fontsize=10)
-    ax.set_title(
-        "Priority waitlist LE benefit by age at ESRD onset\n"
-        "(DDKT outcomes, base-case parameters, conditional on ESRD)",
-        fontsize=11, fontweight="bold", color="#2C2C2A"
-    )
+    ax.set_xlabel("Age at ESRD onset", fontsize=FS_LABEL)
+    ax.set_ylabel("LE benefit of priority waitlist (days)", fontsize=FS_LABEL)
+    # ax.set_title(
+    #     "Priority waitlist LE benefit by age at ESRD onset\n"
+    #     "(DDKT outcomes, base-case parameters, conditional on ESRD)",
+    #     fontsize=11, fontweight="bold", color="#2C2C2A"
+    # )
     ax.spines[["top", "right"]].set_visible(False)
     ax.spines[["left", "bottom"]].set_color("#B4B2A9")
-    ax.tick_params(colors="#5F5E5A", labelsize=9)
+    ax.tick_params(colors="#5F5E5A", labelsize=FS_TICK)
     fig.tight_layout()
     return fig
 
@@ -383,7 +392,8 @@ def main(age_at_esrd: int = 60, n: int = N_PER_ARM):
         ),
         (
             "Standard wait time (days)",
-            {"wl_std_median_days": 750.0}, {"wl_std_median_days": 1200.0},
+            # Range = post-KAS250 SWT/LWT center means (Punjala 2024 Table 4)
+            {"wl_std_median_days": 1491.0}, {"wl_std_median_days": 2100.0},
             False, False, 1.0, 1.0,
         ),
         (

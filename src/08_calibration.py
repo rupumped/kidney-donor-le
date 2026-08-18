@@ -56,8 +56,8 @@ def check_waitlist_outcomes():
 
     Circularity notes
     -----------------
-    Transplant  NON-CIRCULAR  Annual tx-prob derived from median wait (985 d,
-                              Schold AJT 2023) via exponential model; NOT from
+    Transplant  NON-CIRCULAR  Annual tx-prob derived from mean wait (1,765 d,
+                              Punjala 2024) via exponential model; NOT from
                               the KI 22 3-year outcome distribution.
     Died        NON-CIRCULAR  Derived from cross-sectional rate (5.0/100 PY,
                               SRTR KI 24, 2023); NOT from the KI 22 cohort.
@@ -87,7 +87,7 @@ def check_waitlist_outcomes():
         _colhead(),
         _row("Transplanted — all Tx (DDKT + LDKT)",
              cum_tx, obs_all_tx, "NON-CIRCULAR",
-             f"tx-prob {wl_tx:.3f}/yr from 985-d median; SRTR combined = {obs_all_tx:.1%}"),
+             f"tx-prob {wl_tx:.3f}/yr from 1,765-d mean; SRTR combined = {obs_all_tx:.1%}"),
         _row("Transplanted — DDKT only",
              cum_tx, obs_ddkt, "NON-CIRCULAR",
              "Model cannot split DDKT/LDKT; all-Tx comparison is primary"),

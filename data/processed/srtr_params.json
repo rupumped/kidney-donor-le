@@ -14,9 +14,9 @@
   "wl_3yr_ldkt": 0.1346,
   "wl_3yr_died": 0.0683,
   "wl_3yr_removed_other": 0.1906,
-  "wl_annual_removal_competing": 0.126,
-  "wl_std_median_days": 985,
-  "wl_std_median_days_prekas250": 1760,
+  "wl_annual_removal_competing": 0.101,
+  "wl_std_median_days": 1765,
+  "wl_std_median_days_prekas250": 1857,
   "wl_pld_median_days_overall": 100,
   "wl_pld_median_days_from_activation": 23,
   "wl_median_days_ab": 1636,
@@ -47,6 +47,11 @@
   "posttx_ld_5yr_patient_surv_age3549": 0.96093,
   "posttx_ld_5yr_patient_surv_age5064": 0.9167,
   "posttx_ld_5yr_patient_surv_age65p": 0.81944,
-  "graft_annual_fail_postyear1": 0.025,
-  "ddkt_median_graft_surv_yr_2014era": 11.7
+  "ddkt_graft_1yr_assumed": 0.955,
+  "ddkt_median_graft_surv_yr_2014era": 11.7,
+  "graft_annual_fail_postyear1_age1834": 0.0389,
+  "graft_annual_fail_postyear1_age3549": 0.0344,
+  "graft_annual_fail_postyear1_age5064": 0.0493,
+  "graft_annual_fail_postyear1_age65p": 0.0783,
+  "graft_annual_fail_postyear1": 0.0502
 }

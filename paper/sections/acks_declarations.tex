@@ -1,0 +1,23 @@
+\section*{Acknowledgments and Statements and Declarations}
+\label{sec:acks-declarations}
+
+\subsection*{Ethical Considerations}
+This study analyzed only publicly available, de-identified, aggregate data from published cohort studies and national registry reports (USRDS, SRTR/OPTN Annual Data Reports); no primary human-subjects data were collected. Institutional Review Board approval was therefore not applicable.
+
+\subsection*{Consent to Participate}
+Not applicable. This study did not involve primary data collection from human participants.
+
+\subsection*{Consent for Publication}
+Not applicable.
+
+\subsection*{Declaration of Conflicting Interests}
+The author is a living kidney donor; that experience motivated this study. The author declares no potential conflicts of interest with respect to the research, authorship, and/or publication of this article.
+
+\subsection*{Funding}
+This research received no specific grant from any funding agency in the public, commercial, or not-for-profit sectors.
+
+\subsection*{Data Availability}
+All parameter sources are published, publicly available studies and registry reports, cited throughout the manuscript. The simulation code, parameter-assembly pipeline, and calibration checks are implemented in Python~3.10 (NumPy, pandas, matplotlib) and openly available in a public repository at \url{https://github.com/rupumped/kidney-donor-le}, consistent with Level~1 of the Transparency and Openness Promotion (TOP) Guidelines. No restricted-access data were used.
+
+\subsection*{Demographic Classification Variables}
+Race is used in this analysis as reported in the underlying data sources rather than as a directly measured biological quantity. Donor-side race data~\cite{muzaale_risk_2014,massie_quantifying_2017,srtr_2023,usrds_2024,usrds_2025} derive from categories reported to the Organ Procurement and Transplantation Network (OPTN) at donor evaluation and registration; the non-donor comparator population used by \cite{muzaale_risk_2014} was drawn from NHANES~III, in which race is self-reported by participants. Race is included in the model because it is the variable available in these source populations and because it is strongly associated with measured post-donation ESRD incidence. Part of this association has an identified biological correlate, \textit{APOL1} renal-risk-variant genotypes, which are more common among individuals of recent African ancestry and are directly implicated in donor kidney-disease risk.~\cite{doshi_apol1_2018} However, socioeconomic status, healthcare access, comorbidity burden, and other factors correlated with self-reported race in the United States were not available in the source registries and are not separately modelled here. The race-stratified life-expectancy estimates reported in this paper should therefore be interpreted as reflecting the net effect of these unmeasured, race-correlated factors together with any effect of race itself, rather than race operating as an isolated causal variable.

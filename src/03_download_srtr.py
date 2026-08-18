@@ -12,7 +12,7 @@ SRTR 2023 ADR supporting figures:
 Transplant cohort for survival figures: 2016–2018 recipients.
 
 Key figures used (Kidney chapter):
-  Figure KI 22  — 3-year waitlist outcomes (2019–2021 listing cohort)
+  Figure KI 22  — 3-year waitlist outcomes (2018–2020 listing cohort)
   Figure KI 24  — pretransplant mortality rate overall by year
   Figure KI 25  — pretransplant mortality rate by age
   Figure KI 26  — pretransplant mortality rate by race
@@ -66,7 +66,7 @@ SRTR_FALLBACK = {
     "pretx_mort_per_100py_white":    5.71,
     "pretx_mort_per_100py_hispanic": 4.59,
 
-    # ── WAITLIST 3-YEAR OUTCOMES (FIGURE KI 22, 2019–2021 LISTING COHORT) ─
+    # ── WAITLIST 3-YEAR OUTCOMES (FIGURE KI 22, 2018–2020 LISTING COHORT) ─
     "wl_3yr_still_waiting":  0.299,
     "wl_3yr_ddkt":           0.308,
     "wl_3yr_ldkt":           0.135,
@@ -79,10 +79,11 @@ SRTR_FALLBACK = {
     "wl_annual_removal_competing": 0.1260,
 
     # ── MEDIAN WAIT TIMES ─────────────────────────────────────────────────
-    # Post-KAS250 (March 2021) national median: ~32.8 months
-    # Source: ScienceDirect 2024 / Schold AJT 2023
-    "wl_std_median_days": 985,
-    "wl_std_median_days_prekas250": 1760,
+    # National mean waiting time at transplant, Punjala 2024 (Transplant Proc
+    # 56:1740-1751), Table 3: post-KAS250 (5/2021-4/2022) 58 months = 1765 d;
+    # pre-KAS250 (8/2018-7/2019) 61 months = 1857 d.
+    "wl_std_median_days": 1765,
+    "wl_std_median_days_prekas250": 1857,
     # Prior living donors (PLD) — Wainright 2017 AJT, UNOS abstract 2015
     "wl_pld_median_days_overall": 100,
     "wl_pld_median_days_from_activation": 23,
@@ -115,7 +116,7 @@ SRTR_FALLBACK = {
     "posttx_dd_annual_mort_age1834": 0.009,
     "posttx_dd_annual_mort_age3549": 0.018,
     "posttx_dd_annual_mort_age5064": 0.039,
-    "posttx_dd_annual_mort_age65p":  0.068,
+    "posttx_dd_annual_mort_age65p":  0.069,
 
     # ── PATIENT SURVIVAL POST-DDKT BY RACE (FIGURE KI 71, 5-YEAR KM) ─────
     "posttx_dd_5yr_patient_surv_black": 0.837,
@@ -129,19 +130,30 @@ SRTR_FALLBACK = {
     "posttx_ld_5yr_patient_surv_age5064": 0.917,
     "posttx_ld_5yr_patient_surv_age65p":  0.819,
 
-    # Annual graft failure rate post-year-1, derived from SRTR 2023 ADR
-    # Figure KI 53 (DDKT, 2016–2018 cohort) age 35–49 KM:
-    #   Assume 1-yr graft survival ≈ 0.955, 5-yr = 0.835.
-    #   Annual rate post year 1 = 1 − (0.835/0.955)^(1/4) ≈ 0.033.
-    #   Age 18–34 (5yr=0.822): 1-(0.822/0.955)^0.25 ≈ 0.037.
-    #   Age 50–64 (5yr=0.768): 1-(0.768/0.955)^0.25 ≈ 0.052.
-    #   Simple age-weighted average ≈ 0.025–0.033/yr; 0.025 used as
-    #   conservative (lower-mortality) base case for the simulation.
-    "graft_annual_fail_postyear1": 0.025,
+    # Assumed national DDKT 1-year graft survival, paired with the
+    # age-specific 5-year values above to derive post-year-1 annual graft
+    # failure below.  Overridden by the true age-specific 1-yr KM value when
+    # parsed directly from the ADR Excel (see main()).
+    "ddkt_graft_1yr_assumed": 0.955,
     # Long-term median graft survival — Schold JD et al., AJT 2021;21(5):1729–1738
     # (SRTR data 1995–2017, 2014-era cohort half-life 11.7 yr for DDKT)
     "ddkt_median_graft_surv_yr_2014era": 11.7,
 }
+
+# Age-stratified post-year-1 annual graft failure, derived as
+# 1 - (5yr_survival / 1yr_survival)^(1/4) from the Figure KI 53 values above.
+# A single flat rate cannot represent this: the four age bands span roughly
+# 3.3%-8.8%/yr once actually computed. (An earlier version hardcoded a flat
+# 2.5%/yr "conservative" value that undershot every age band; see paper
+# design.tex for the correction.) The flat "graft_annual_fail_postyear1" key
+# is kept only as a fallback for an unmatched/unspecified age.
+for _age_key in ("age1834", "age3549", "age5064", "age65p"):
+    SRTR_FALLBACK[f"graft_annual_fail_postyear1_{_age_key}"] = round(
+        1 - (SRTR_FALLBACK[f"ddkt_graft_5yr_{_age_key}"]
+             / SRTR_FALLBACK["ddkt_graft_1yr_assumed"]) ** 0.25, 4)
+SRTR_FALLBACK["graft_annual_fail_postyear1"] = round(sum(
+    SRTR_FALLBACK[f"graft_annual_fail_postyear1_{_k}"]
+    for _k in ("age1834", "age3549", "age5064", "age65p")) / 4, 4)
 
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -320,7 +332,7 @@ def main():
             wl_mort_a = 1.0 - math.exp(
                 -params.get("pretx_mort_per_100py_overall_2023", 5.0) / 100)
             wl_tx_a   = float(median_to_annual_tx_prob(
-                float(params.get("wl_std_median_days", 985))))
+                float(params.get("wl_std_median_days", 1765))))
             params["wl_annual_removal_competing"] = _solve_removal_rate(
                 params["wl_3yr_removed_other"], wl_tx_a, wl_mort_a)
 
@@ -328,19 +340,35 @@ def main():
         ddkt_rows = km_to_rows(xl, "KI-F53-tx-adult-GF-DD-5yr-age", "DDKT")
         if ddkt_rows:
             graft_rows.extend(ddkt_rows)
-            # update scalar params for 5-year values
+            age_suffix_map = {
+                "18-34 years": "age1834",
+                "35-49":       "age3549",
+                "50-64":       "age5064",
+                "65+":         "age65p",
+            }
+            # Collect 1-yr and 5-yr survival per age band from the same sheet
+            surv_by_age = {}
             for r in ddkt_rows:
-                if r["timepoint"] == "5yr":
-                    ag = r["age_group"]
-                    surv = r["survival"]
-                    key_map = {
-                        "18-34 years": "ddkt_graft_5yr_age1834",
-                        "35-49":       "ddkt_graft_5yr_age3549",
-                        "50-64":       "ddkt_graft_5yr_age5064",
-                        "65+":         "ddkt_graft_5yr_age65p",
-                    }
-                    if ag in key_map:
-                        params[key_map[ag]] = surv
+                ag = r["age_group"]
+                if ag in age_suffix_map and r["timepoint"] in ("1yr", "5yr"):
+                    surv_by_age.setdefault(ag, {})[r["timepoint"]] = r["survival"]
+
+            for ag, suffix in age_suffix_map.items():
+                vals = surv_by_age.get(ag, {})
+                if "5yr" in vals:
+                    params[f"ddkt_graft_5yr_{suffix}"] = vals["5yr"]
+                # Post-year-1 annual graft failure: use the *actual*
+                # age-specific 1-yr KM value from this sheet rather than the
+                # assumed national constant used in the SRTR_FALLBACK default.
+                if "1yr" in vals and "5yr" in vals and vals["1yr"] > 0:
+                    params[f"graft_annual_fail_postyear1_{suffix}"] = round(
+                        1 - (vals["5yr"] / vals["1yr"]) ** 0.25, 4)
+
+            _fail_keys = [f"graft_annual_fail_postyear1_{s}"
+                          for s in age_suffix_map.values()]
+            if all(k in params for k in _fail_keys):
+                params["graft_annual_fail_postyear1"] = round(
+                    sum(params[k] for k in _fail_keys) / len(_fail_keys), 4)
 
         # ── LDKT graft survival (Figure KI 61) ───────────────────────────
         ldkt_rows = km_to_rows(xl, "KI-F61-tx-adult-GF-LD-5yr-age", "LDKT")
@@ -447,6 +475,10 @@ def main():
     print(f"    DDKT 5-yr graft surv (65+):      {p['ddkt_graft_5yr_age65p']:.1%}")
     print(f"    DD 5-yr patient surv (50–64):    {p['posttx_dd_5yr_patient_surv_age5064']:.1%}")
     print(f"    DD 5-yr patient surv (65+):      {p['posttx_dd_5yr_patient_surv_age65p']:.1%}")
+    print(f"    Graft failure post-yr1 (18–34):  {p['graft_annual_fail_postyear1_age1834']:.1%}/yr")
+    print(f"    Graft failure post-yr1 (35–49):  {p['graft_annual_fail_postyear1_age3549']:.1%}/yr")
+    print(f"    Graft failure post-yr1 (50–64):  {p['graft_annual_fail_postyear1_age5064']:.1%}/yr")
+    print(f"    Graft failure post-yr1 (65+):    {p['graft_annual_fail_postyear1_age65p']:.1%}/yr")
     print("\nDone.")
 
 

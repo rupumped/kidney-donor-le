@@ -7,7 +7,9 @@ in the parameter confirmation notes.
 
 Key reconciliation decisions:
   1. White non-donor ESRD baseline: use Grams 2016 (0.05%) not Muzaale (0%)
-  2. Post-KAS250 wait times (March 2021): 985 days standard, 100 days PLD
+  2. Wait times: national mean waiting time at transplant, Punjala 2024 (Table 3)
+     — post-KAS250 (5/2021-4/2022): 58 months (1765 d) standard, 102.6 d PLD;
+     pre-KAS250 (8/2018-7/2019) sensitivity: 61 months (1857 d) standard
   3. Donor all-cause mortality HR: base case 1.0 (Muzaale/US), sensitivity 1.30 (Mjøen)
   4. ESRD Weibull shape k=1.5 (supported by Massie 2017 20-yr data)
   5. Race-specific waitlist/post-tx parameters from SRTR 2023 ADR
@@ -99,10 +101,10 @@ def main():
     params["wl_removal_rate_yr"]         = srtr.get("wl_annual_removal_competing", 0.1260)
 
     # Wait times: post-KAS250 figures (RECONCILIATION DECISION 2)
-    params["wl_std_median_days"] = srtr.get("wl_std_median_days", 985)
+    params["wl_std_median_days"] = srtr.get("wl_std_median_days", 1765)
     params["wl_pld_median_days"] = w.get("pld_mwt_days_post_kas", 102.6)
     # Sensitivity scenarios
-    params["wl_std_median_days_prekas250"] = srtr.get("wl_std_median_days_prekas250", 1760)
+    params["wl_std_median_days_prekas250"] = srtr.get("wl_std_median_days_prekas250", 1857)
     params["wl_pld_median_days_from_activation"] = w.get("pld_mwt_from_activation", 23.0)
 
     # Conditional per-cycle listing probability, calibrated from
@@ -145,7 +147,25 @@ def main():
         "posttx_dd_annual_mort_white",
         srtr.get("posttx_annual_mort_white", 0.038)
     )
-    params["graft_annual_fail_postyear1"] = srtr.get("graft_annual_fail_postyear1", 0.025)
+    # Age-stratified post-year-1 graft failure (SRTR 2023 ADR Figure KI 53).
+    # Prefer the value already computed in 03_download_srtr.py; if a key is
+    # missing (e.g. stale/partial srtr_params.json), recompute it here from
+    # the same 5-yr/1-yr graft survival inputs rather than falling back to
+    # an arbitrary flat number. A single flat rate materially understated
+    # every age band (previously 0.025 vs. a true ~3.3%-8.8%/yr range).
+    _gf_one_yr = srtr.get("ddkt_graft_1yr_assumed", 0.955)
+    _gf_fallback_5yr = {"age1834": 0.822, "age3549": 0.835,
+                         "age5064": 0.768, "age65p":  0.661}
+    _gf_keys = []
+    for _band, _fb5 in _gf_fallback_5yr.items():
+        _key = f"graft_annual_fail_postyear1_{_band}"
+        _default = round(1 - (srtr.get(f"ddkt_graft_5yr_{_band}", _fb5)
+                               / _gf_one_yr) ** 0.25, 4)
+        params[_key] = srtr.get(_key, _default)
+        _gf_keys.append(_key)
+    params["graft_annual_fail_postyear1"] = round(
+        sum(params[k] * w for k, w in zip(_gf_keys, _age_weights)), 4
+    )
 
     # Age-stratified LDKT annual mortality (SRTR 2023 ADR Figure KI 76)
     for band, fallback in [("age1834", 0.979), ("age3549", 0.961),
@@ -191,8 +211,8 @@ def main():
     }
     params["_reconciliation_notes"] = [
         "White non-donor baseline uses Grams 2016 (0.05%) not Muzaale (0 events/unstable)",
-        "Wait times use post-KAS250 figures (985d standard, ~100d PLD); "
-        "pre-KAS250 in sensitivity",
+        "Wait times use Punjala 2024 national mean waiting time at transplant: "
+        "1765d standard post-KAS250 (100d PLD, Wainright 2017); 1857d pre-KAS250 sensitivity",
         "Donor all-cause mortality HR=1.0 base case per US evidence; "
         "1.30 as sensitivity (Mjøen)",
         "Weibull k=1.5 supported by Massie 2017 20-yr data showing accelerating hazard",

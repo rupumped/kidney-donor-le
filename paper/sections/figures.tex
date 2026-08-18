@@ -1,0 +1,37 @@
+\section*{Figures}
+\label{sec:figures}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\linewidth]{figures/markov_model_kidney_donation.pdf}
+	\caption{The Markov model for kidney donation.}
+	\label{fig:markov}
+\end{figure}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\linewidth]{figures/kidney_model_age_race_sex_matrix.png}
+	\caption{\textbf{Life-expectancy impact of kidney donation by age, race, and sex.} Each cell shows $\Delta$LE (donor minus non-donor, days) for the indicated sex panel, race row, and age-at-donation column. Subgroup effects sum: a Black male donor at age~25 loses 249~days, compared with 10~days for a White female donor at age~55.}
+	\label{fig:age_race_sex_matrix}
+\end{figure}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\linewidth]{figures/kidney_model_B_psa.png}
+	\caption{\textbf{Probabilistic sensitivity analysis (PSA).} Histogram of $\Delta$LE (donor minus non-donor, days). The dashed vertical line marks zero; orange dotted lines mark the 95\% credible interval bounds.}
+	\label{fig:psa}
+\end{figure}
+
+\begin{figure*}[h]
+	\centering
+	\includegraphics[width=\linewidth]{figures/kidney_model_C_tornado.png}
+	\caption{\textbf{One-way sensitivity analysis — tornado chart.} Each bar shows the $\Delta$LE resulting from testing the indicated parameter value (see Table~\ref{tab:owsa} for exact values). Vertical dashed line shows base case. The donor all-cause mortality HR (top bar, truncated at left) produces a >1,000-day shift that dwarfs every other parameter. The right panel uses a finer scale to show that all other parameters produce swings of $\leq 32$~days. Priority waitlist parameters (``No priority'' and ``PLD wait'' rows) are barely distinguishable from the base case, confirming the negligible population-level effect of transplant priority.}
+	\label{fig:tornado}
+\end{figure*}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\linewidth]{figures/esrd_conditional_age_sweep.png}
+	\caption{\textbf{Priority waitlist LE benefit conditional on ESRD onset, by age.} $\Delta$LE (priority minus standard waitlist, days) for individuals who have already developed ESRD, as a function of age at ESRD onset. Conditional on ESRD, priority access is highly valuable: $+605$~days at age~40 onset, $+209$~days at age~60. This large conditional benefit is diluted to $\leq 0.8$~days at the population level by the low ESRD incidence in non-donors ($\approx 0.04\%$/15~yr) and in donors ($\approx 0.3\%$/15~yr).}
+	\label{fig:esrd_conditional}
+\end{figure}

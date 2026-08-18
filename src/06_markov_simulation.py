@@ -19,7 +19,10 @@ Parameters loaded from data/processed/params.json (produced by scripts 01–05).
 Falls back to hard-coded confirmed values if params.json is absent.
 
 Usage:
-  python src/06_markov_simulation.py
+  python src/06_markov_simulation.py                     # generate everything
+  python src/06_markov_simulation.py --list               # list available outputs
+  python src/06_markov_simulation.py --plots distributions psa   # generate only these
+  python src/06_markov_simulation.py --plots table         # just the summary CSV
 
 Outputs in results/:
   kidney_model_results.csv              — summary table
@@ -36,6 +39,7 @@ Outputs in results/:
   kidney_model_age_race_sex_matrix.png  — age × race faceted by sex (all three variables)
 """
 
+import argparse
 import sys
 import numpy as np
 import pandas as pd
@@ -62,6 +66,12 @@ CYCLE_YRS =       1.0   # annual Markov cycles
 # ── LIFE TABLE ────────────────────────────────────────────────────────────────
 _lt_path = DATA_PROC / "lifetable_combined_2021.csv"
 LIFE_TABLE_QX = load_life_table(_lt_path if _lt_path.exists() else None)
+
+# ── FIGURE CONSTANTS ──────────────────────────────────────────────────────────
+FS_TITLE = 14
+FS_TICK = 14
+FS_LABEL = 15
+FS_CELL = 14
 
 # ── BASE-CASE PARAMETERS ──────────────────────────────────────────────────────
 # Loaded from params.json if available; otherwise hard-coded confirmed values.
@@ -192,7 +202,6 @@ def simulate_cohort(p, n, age_at_entry, donor: bool, rng, life_table=None):
 	dial_mort1 = p["dialysis_1yr_mort"]   # first year on dialysis
 	dial_mort  = p["dialysis_annual_mort"]
 	bg_hr      = p.get("donor_mort_hr", 1.0) if donor else 1.0
-	graft_fail_rate = p.get("graft_annual_fail_postyear1", 0.025)
 
 	# One-time preemptive listing probability at ESRD onset (USRDS 2025 Fig 7.13)
 	preemptive_p = float(p.get(
@@ -277,6 +286,12 @@ def simulate_cohort(p, n, age_at_entry, donor: bool, rng, life_table=None):
 			elif a < 50: ptx_mort = p.get("posttx_annual_mort_age3549", p["posttx_annual_mort"])
 			elif a < 65: ptx_mort = p.get("posttx_annual_mort_age5064", p["posttx_annual_mort"])
 			else:        ptx_mort = p.get("posttx_annual_mort_age65p",  p["posttx_annual_mort"])
+			# Age-stratified post-year-1 graft failure (SRTR 2023 KI 53)
+			gf_base = p.get("graft_annual_fail_postyear1", 0.025)
+			if a < 35:   graft_fail_rate = p.get("graft_annual_fail_postyear1_age1834", gf_base)
+			elif a < 50: graft_fail_rate = p.get("graft_annual_fail_postyear1_age3549", gf_base)
+			elif a < 65: graft_fail_rate = p.get("graft_annual_fail_postyear1_age5064", gf_base)
+			else:        graft_fail_rate = p.get("graft_annual_fail_postyear1_age65p",  gf_base)
 			die_ptx    = u[mask4, 0] < ptx_mort
 			graft_fail = (~die_ptx) & (u[mask4, 1] < graft_fail_rate)
 			new_state[idx[die_ptx]]    = 5
@@ -314,7 +329,6 @@ def run_arm_analytic(p, age_at_entry: int, donor: bool, life_table=None) -> floa
 	dial_mort1    = float(p["dialysis_1yr_mort"])
 	dial_mort     = float(p["dialysis_annual_mort"])
 	bg_hr         = float(p.get("donor_mort_hr", 1.0)) if donor else 1.0
-	graft_fail    = float(p.get("graft_annual_fail_postyear1", 0.025))
 	preemptive_p  = float(p.get(
 		"esrd_preemptive_prob_pld" if donor else "esrd_preemptive_prob_std", 0.0))
 
@@ -337,6 +351,12 @@ def run_arm_analytic(p, age_at_entry: int, donor: bool, life_table=None) -> floa
 		elif age < 50: ptx_mort = float(p.get("posttx_annual_mort_age3549", p["posttx_annual_mort"]))
 		elif age < 65: ptx_mort = float(p.get("posttx_annual_mort_age5064", p["posttx_annual_mort"]))
 		else:          ptx_mort = float(p.get("posttx_annual_mort_age65p",  p["posttx_annual_mort"]))
+
+		gf_base = p.get("graft_annual_fail_postyear1", 0.025)
+		if age < 35:   graft_fail = float(p.get("graft_annual_fail_postyear1_age1834", gf_base))
+		elif age < 50: graft_fail = float(p.get("graft_annual_fail_postyear1_age3549", gf_base))
+		elif age < 65: graft_fail = float(p.get("graft_annual_fail_postyear1_age5064", gf_base))
+		else:          graft_fail = float(p.get("graft_annual_fail_postyear1_age65p",  gf_base))
 
 		H_die  = H * q_bg;     H_surv = H - H_die
 		H_esrd = H_surv * p_esrd;      H_stay = H_surv - H_esrd
@@ -426,13 +446,12 @@ def run_owsa(age_at_donation=40):
 	scenarios = {
 		"ESRD RR ×2 vs controls":        {"esrd_15yr_donor_overall": 0.00039 * 2},
 		"ESRD RR ×4 vs controls":        {"esrd_15yr_donor_overall": 0.00039 * 4},
-		"ESRD RR ×8 — base case":        {},
 		"ESRD RR ×11 (Mjøen upper)":     {"esrd_15yr_donor_overall": 0.00039 * 11},
 		"Std wait 24 months":            {"wl_std_median_days": 730},
-		"Std wait 58 months (pre-KAS)":  {"wl_std_median_days": 1760},
+		"Std wait 61 months (pre-KAS)":  {"wl_std_median_days": 1857},
 		"PLD wait 50 days (optimistic)": {"wl_pld_median_days": 50},
 		"PLD wait 200 days":             {"wl_pld_median_days": 200},
-		"No priority (PLD=standard)":    {"wl_pld_median_days": 985},
+		"No priority (PLD=standard)":    {"wl_pld_median_days": 1765},
 		"Dialysis mort +50%":            {"dialysis_annual_mort": 0.255},
 		"Dialysis mort -50%":            {"dialysis_annual_mort": 0.085},
 		"Donor mort HR=1.30 (Mjøen)":    {"donor_mort_hr": 1.30},
@@ -574,11 +593,11 @@ def run_sex_subgroups(age_at_donation=40, n=500_000):
 	lt_female = load_life_table(lt_f_path if lt_f_path.exists() else None)
 
 	# Donor ESRD rates: scaled via Massie 2017 within-donor sex HR (1.88).
-	# Sex mix: 60% female — SRTR 2023 ADR Figure KI 7 (59–61%, 2019–2023).
+	# Sex mix: 63.5% female — SRTR 2023 ADR Figure KI 104 (2023 value).
 	# Non-donor rates: Grams 2016 sex-specific direct values (Option C).
 	# Using Massie HR to scale the non-donor arm is inappropriate because that
 	# HR was estimated within the donor cohort, not the general population.
-	f_female = 0.60
+	f_female = 0.635
 	f_male   = 1.0 - f_female
 	hr_male  = float(BASE.get("hr_male_sex", 1.88))
 	denom    = f_female + f_male * hr_male
@@ -632,16 +651,15 @@ _CORAL  = "#D85A30"
 _PURPLE = "#534AB7"
 _AMBER  = "#BA7517"
 _GRAY   = "#888780"
-_LIGHT  = "#F1EFE8"
+_LIGHT  = "#FFFFFF"
 
 
-def _style_ax(ax, title, fontsize=10):
+def _style_ax(ax):
 	ax.set_facecolor(_LIGHT)
 	ax.spines[["top", "right"]].set_visible(False)
 	ax.spines[["left", "bottom"]].set_color("#B4B2A9")
 	ax.tick_params(colors="#5F5E5A", labelsize=9)
-	ax.set_title(title, fontsize=fontsize, fontweight="bold", color="#2C2C2A", pad=7)
-
+	# ax.set_title(title, fontsize=FS_TITLE, fontweight="bold", color="#2C2C2A", pad=7)
 
 # ── (A) LE DISTRIBUTIONS ──────────────────────────────────────────────────────
 def make_fig_distributions(base_res):
@@ -658,8 +676,7 @@ def make_fig_distributions(base_res):
 	ax.legend(fontsize=9, frameon=False)
 	ax.set_xlabel("Remaining life-years from donation age", fontsize=9)
 	ax.set_ylabel("Density", fontsize=9)
-	_style_ax(ax, f"Lifetime distributions — base case (age {age}, n={N_SIM//1_000_000}M/arm)",
-			  fontsize=11)
+	_style_ax(ax)
 	fig.tight_layout()
 	return fig
 
@@ -667,7 +684,7 @@ def make_fig_distributions(base_res):
 # ── (B) PSA ───────────────────────────────────────────────────────────────────
 def make_fig_psa(psa_diffs):
 	fig, ax = plt.subplots(figsize=(6, 4))
-	fig.patch.set_facecolor("#FAFAF8")
+	fig.patch.set_facecolor("#FFFFFF")
 	ax.hist(psa_diffs * 365.25, bins=40, color=_PURPLE, alpha=0.75,
 			edgecolor="white", linewidth=0.3)
 	ax.axvline(0, color=_GRAY, lw=1.5, ls="--")
@@ -675,10 +692,9 @@ def make_fig_psa(psa_diffs):
 	ax.axvline(lo, color=_AMBER, lw=1, ls=":")
 	ax.axvline(hi, color=_AMBER, lw=1, ls=":")
 	p_ben = (psa_diffs > 0).mean()
-	ax.set_xlabel("ΔLE (days): donor − non-donor", fontsize=9)
-	ax.set_ylabel("Count", fontsize=9)
-	_style_ax(ax, f"PSA ({N_DRAWS} draws)\nP(beneficial)={p_ben:.0%}, 95% CrI [{lo:.0f}, {hi:.0f}] d",
-			  fontsize=10)
+	ax.set_xlabel("ΔLE (days): donor − non-donor", fontsize=FS_LABEL)
+	ax.set_ylabel("Count", fontsize=FS_LABEL)
+	_style_ax(ax)
 	fig.tight_layout()
 	return fig
 
@@ -701,7 +717,7 @@ def make_fig_tornado(owsa_res):
 	break_val     = dominant_sign * break_abs
 
 	fig = plt.figure(figsize=(14, 5))
-	fig.patch.set_facecolor("#FAFAF8")
+	fig.patch.set_facecolor("#FFFFFF")
 	gs = gridspec.GridSpec(1, 2, figure=fig,
 						   width_ratios=[1, 3] if dominant_sign < 0 else [3, 1],
 						   wspace=0.03)
@@ -724,10 +740,10 @@ def make_fig_tornado(owsa_res):
 		ax.set_facecolor(_LIGHT)
 		ax.spines["top"].set_visible(False)
 		ax.spines["bottom"].set_color("#B4B2A9")
-		ax.tick_params(colors="#5F5E5A", labelsize=9)
+		ax.tick_params(colors="#5F5E5A", labelsize=FS_TICK)
 
 	ax_main.set_yticks(y_pos)
-	ax_main.set_yticklabels(labels_s, fontsize=9)
+	ax_main.set_yticklabels(labels_s, fontsize=FS_TICK)
 	ax_main.yaxis.tick_right()
 	ax_ext.set_yticks([])
 
@@ -763,11 +779,15 @@ def make_fig_tornado(owsa_res):
 		va="center", ha="center", fontsize=8.5, color="white", fontweight="bold"
 	)
 
-	ax_ext.set_xlabel("ΔLE (days)", fontsize=9)
-	ax_ext.set_facecolor("#EDE9E0")
-	ax_main.set_xlabel("ΔLE (days): donor − non-donor", fontsize=9)
-	ax_main.set_title("One-way sensitivity analysis — tornado chart",
-					  fontsize=11, fontweight="bold", color="#2C2C2A", pad=7)
+	base_case = -37
+	for ax, xlim in ((ax_ext, ext_xlim), (ax_main, main_xlim)):
+		if min(xlim) <= base_case <= max(xlim):
+			ax.axvline(base_case, color=_GRAY, lw=1.3, ls="--", zorder=4)
+
+	# ax_ext.set_xlabel("ΔLE (days)", fontsize=FS_LABEL)
+	ax_ext.set_facecolor("#FFFFFF")
+	ax_main.set_xlabel("ΔLE (days): donor − non-donor", fontsize=FS_LABEL)
+	# ax_main.set_title("One-way sensitivity analysis — tornado chart", fontsize=11, fontweight="bold", color="#2C2C2A", pad=7)
 	return fig
 
 
@@ -783,7 +803,7 @@ def make_fig_age_subgroup(age_res):
 	ax.set_xticks(range(len(ages_s)))
 	ax.set_xticklabels([f"Age {a}" for a in ages_s], fontsize=9)
 	ax.set_ylabel("ΔLE (days)", fontsize=9)
-	_style_ax(ax, "ΔLE by age at donation", fontsize=11)
+	_style_ax(ax)
 	fig.tight_layout()
 	return fig
 
@@ -800,7 +820,7 @@ def make_fig_race_subgroup(race_res):
 	ax.set_xticks(range(len(race_labels)))
 	ax.set_xticklabels(race_labels, fontsize=8.5)
 	ax.set_ylabel("ΔLE (days)", fontsize=9)
-	_style_ax(ax, "ΔLE by race", fontsize=11)
+	_style_ax(ax)
 	fig.tight_layout()
 	return fig
 
@@ -937,21 +957,21 @@ def make_age_race_matrix():
 			val = matrix[r, a]
 			color = "black" if abs(val) < 0.6 * abs_max else "white"
 			ax.text(a, r, f"{val:+.0f} d", ha="center", va="center",
-					fontsize=11, fontweight="bold", color=color)
+					fontsize=FS_CELL, fontweight="bold", color=color)
 
 	ax.set_xticks(range(len(ages)))
-	ax.set_xticklabels([f"Age {a}" for a in ages], fontsize=10)
+	ax.set_xticklabels([f"Age {a}" for a in ages], fontsize=12)
 	ax.set_yticks(range(len(races)))
-	ax.set_yticklabels(races, fontsize=11, fontweight="bold")
-	ax.set_xlabel("Age at donation", fontsize=11)
+	ax.set_yticklabels(races, fontsize=12)
+	ax.set_xlabel("Age at donation", fontsize=12)
 
 	cbar = fig.colorbar(im, ax=ax, fraction=0.03, pad=0.02)
 	cbar.set_label("ΔLE (days): donor − non-donor", fontsize=9)
 
-	ax.set_title(
-		"Life-expectancy impact of kidney donation by age and race\n"
-		"Donor vs matched non-donor  |  analytic cohort Markov  |  green = donor benefit, red = donor harm",
-		fontsize=11, fontweight="bold", color="#2C2C2A", pad=10)
+	# ax.set_title(
+	# 	"Life-expectancy impact of kidney donation by age and race\n"
+	# 	"Donor vs matched non-donor  |  analytic cohort Markov  |  green = donor benefit, red = donor harm",
+	# 	fontsize=11, fontweight="bold", color="#2C2C2A", pad=10)
 
 	ax.spines[:].set_visible(False)
 	ax.tick_params(length=0)
@@ -971,7 +991,7 @@ def make_age_sex_matrix():
 
 	# Donor rates: Massie 2017 within-donor sex HR. Non-donor rates: Grams 2016
 	# sex-specific direct values (Option C — same sourcing as sex×race matrix).
-	f_female = 0.60  # SRTR 2023 ADR Figure KI 7: 59-61% of LD donors female
+	f_female = 0.635  # SRTR 2023 ADR Figure KI 104: 63.5% of LD donors female (2023)
 	hr_male  = float(BASE.get("hr_male_sex", 1.88))
 	denom    = f_female + (1.0 - f_female) * hr_male
 
@@ -1049,7 +1069,7 @@ def make_sex_race_matrix():
 	lt_male   = load_life_table(lt_m_path if lt_m_path.exists() else None)
 	lt_female = load_life_table(lt_f_path if lt_f_path.exists() else None)
 
-	f_female = 0.60  # SRTR 2023 ADR Figure KI 7: 59-61% of LD donors female
+	f_female = 0.635  # SRTR 2023 ADR Figure KI 104: 63.5% of LD donors female (2023)
 	hr_male  = float(BASE.get("hr_male_sex", 1.88))
 	denom    = f_female + (1.0 - f_female) * hr_male
 
@@ -1152,7 +1172,7 @@ def make_age_race_sex_matrix():
 	lt_male   = load_life_table(lt_m_path if lt_m_path.exists() else None)
 	lt_female = load_life_table(lt_f_path if lt_f_path.exists() else None)
 
-	f_female = 0.60  # SRTR 2023 ADR Figure KI 7: 59-61% of LD donors female
+	f_female = 0.635  # SRTR 2023 ADR Figure KI 104: 63.5% of LD donors female (2023)
 	hr_male  = float(BASE.get("hr_male_sex", 1.88))
 	denom    = f_female + (1.0 - f_female) * hr_male
 
@@ -1208,40 +1228,35 @@ def make_age_race_sex_matrix():
 
 	abs_max = max(np.abs(m).max() for m in matrices.values())
 
-	fig, axes = plt.subplots(1, 3, figsize=(20, 4))
-	fig.patch.set_facecolor("#FAFAF8")
+	fig, axes = plt.subplots(3, 1, figsize=(9, 11), constrained_layout=True)
+	fig.patch.set_facecolor("white")
 
 	im = None
 	for i, (ax, sex) in enumerate(zip(axes, sexes)):
 		mat = matrices[sex]
-		ax.set_facecolor("#FAFAF8")
+		ax.set_facecolor("white")
 		im = ax.imshow(mat, cmap="RdYlGn", vmin=-abs_max, vmax=abs_max, aspect="auto")
 
 		for r in range(len(races)):
 			for a in range(len(ages)):
 				val = mat[r, a]
 				color = "black" if abs(val) < 0.6 * abs_max else "white"
-				ax.text(a, r, f"{val:+.0f} d", ha="center", va="center",
-						fontsize=9, fontweight="bold", color=color)
+				ax.text(a, r, f"{val:+.0f} d", ha="center", va="center",fontsize=FS_CELL, fontweight="bold", color=color)
 
 		ax.set_xticks(range(len(ages)))
-		ax.set_xticklabels([f"Age {a}" for a in ages], fontsize=9)
+		is_last = i == len(sexes) - 1
+		ax.set_xticklabels([f"Age {a}" for a in ages] if is_last else [], fontsize=FS_TICK)
 		ax.set_yticks(range(len(races)))
-		ax.set_yticklabels(races if i == 0 else [], fontsize=10, fontweight="bold")
-		ax.set_xlabel("Age at donation", fontsize=10)
-		ax.set_title(sex, fontsize=13, fontweight="bold", color="#2C2C2A", pad=6)
+		ax.set_yticklabels(races, fontsize=FS_TICK)
+		ax.set_xlabel("Age at donation" if is_last else "", fontsize=FS_LABEL)
+		# ax.set_title(sex, fontsize=17, fontweight="bold", color="#2C2C2A", pad=6)
 		ax.spines[:].set_visible(False)
 		ax.tick_params(length=0)
 
-	cbar = fig.colorbar(im, ax=axes[2], fraction=0.05, pad=0.02)
-	cbar.set_label("ΔLE (days): donor − non-donor", fontsize=9)
+	cbar = fig.colorbar(im, ax=axes, fraction=0.05, pad=0.02)
+	cbar.set_label("ΔLE (days): donor − non-donor", fontsize=FS_LABEL)
+	cbar.ax.tick_params(labelsize=11)
 
-	fig.suptitle(
-		"Life-expectancy impact of kidney donation by age, race, and sex\n"
-		"Donor vs matched non-donor  |  analytic cohort Markov  |  green = donor benefit, red = donor harm",
-		fontsize=11, fontweight="bold", color="#2C2C2A", y=1.05)
-
-	plt.tight_layout()
 	return fig
 
 
@@ -1309,88 +1324,112 @@ def make_results_table(base_res, psa_diffs, owsa_res, age_res, race_res, sex_res
 	return pd.DataFrame(rows)
 
 
+# ── OUTPUT REGISTRY ───────────────────────────────────────────────────────────
+# Maps each generatable output to the computed analyses ("computes") it needs
+# and how to build it from those. Lets --plots request a subset without
+# re-running analyses that no requested output actually depends on.
+PLOT_REGISTRY = {
+	"distributions":       {"deps": ["base"],
+							 "make": lambda ctx: make_fig_distributions(ctx["base"]),
+							 "file": "kidney_model_A_distributions.png"},
+	"psa":                 {"deps": ["psa"],
+							 "make": lambda ctx: make_fig_psa(ctx["psa"]),
+							 "file": "kidney_model_B_psa.png"},
+	"tornado":             {"deps": ["owsa"],
+							 "make": lambda ctx: make_fig_tornado(ctx["owsa"]),
+							 "file": "kidney_model_C_tornado.png"},
+	"age_subgroup":        {"deps": ["age"],
+							 "make": lambda ctx: make_fig_age_subgroup(ctx["age"]),
+							 "file": "kidney_model_D_age_subgroup.png"},
+	"race_subgroup":       {"deps": ["race"],
+							 "make": lambda ctx: make_fig_race_subgroup(ctx["race"]),
+							 "file": "kidney_model_E_race_subgroup.png"},
+	"age_race_matrix":     {"deps": [],
+							 "make": lambda ctx: make_age_race_matrix(),
+							 "file": "kidney_model_age_race_matrix.png"},
+	"age_sex_matrix":      {"deps": [],
+							 "make": lambda ctx: make_age_sex_matrix(),
+							 "file": "kidney_model_age_sex_matrix.png"},
+	"sex_race_matrix":     {"deps": [],
+							 "make": lambda ctx: make_sex_race_matrix(),
+							 "file": "kidney_model_sex_race_matrix.png"},
+	"age_race_sex_matrix": {"deps": [],
+							 "make": lambda ctx: make_age_race_sex_matrix(),
+							 "file": "kidney_model_age_race_sex_matrix.png"},
+	"race":                {"deps": ["race"],
+							 "make": lambda ctx: make_race_figure(ctx["race"], age_at_donation=40),
+							 "file": "kidney_model_race.png"},
+	"sex":                 {"deps": ["sex"],
+							 "make": lambda ctx: make_sex_figure(ctx["sex"]),
+							 "file": "kidney_model_sex.png"},
+	"table":               {"deps": ["base", "psa", "owsa", "age", "race", "sex"],
+							 "make": lambda ctx: make_results_table(
+								 ctx["base"], ctx["psa"], ctx["owsa"],
+								 ctx["age"], ctx["race"], ctx["sex"]),
+							 "file": "kidney_model_results.csv"},
+}
+
+# How to compute each dependency, given prior context (all take no args except
+# "table"'s deps, which read straight from ctx already built by earlier steps).
+_COMPUTE_STEPS = {
+	"base":  lambda ctx: run_base_case(age_at_donation=40, n=N_SIM),
+	"psa":   lambda ctx: run_psa(age_at_donation=40, n_draws=N_DRAWS),
+	"owsa":  lambda ctx: run_owsa(age_at_donation=40),
+	"age":   lambda ctx: run_age_subgroups(),
+	"race":  lambda ctx: run_race_subgroups(age_at_donation=40),
+	"sex":   lambda ctx: run_sex_subgroups(age_at_donation=40),
+}
+
+
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 def main():
+	parser = argparse.ArgumentParser(
+		description="Living kidney donation Markov life-expectancy model.")
+	parser.add_argument(
+		"--plots", nargs="+", metavar="NAME",
+		choices=list(PLOT_REGISTRY.keys()) + ["all"], default=["all"],
+		help="Which output(s) to generate (default: all). "
+			 "Use --list to see available names.")
+	parser.add_argument(
+		"--list", action="store_true",
+		help="List available output names and exit.")
+	args = parser.parse_args()
+
+	if args.list:
+		for name, entry in PLOT_REGISTRY.items():
+			print(f"  {name:<21} → {entry['file']}")
+		return
+
+	selected = list(PLOT_REGISTRY.keys()) if "all" in args.plots else args.plots
+
 	print("="*60)
 	print("LIVING KIDNEY DONATION MARKOV MODEL")
 	print("="*60)
 
-	base_res  = run_base_case(age_at_donation=40, n=N_SIM)
-	psa_diffs = run_psa(age_at_donation=40, n_draws=N_DRAWS)
-	owsa_res  = run_owsa(age_at_donation=40)
-	age_res   = run_age_subgroups()
-	race_res  = run_race_subgroups(age_at_donation=40)
-	sex_res   = run_sex_subgroups(age_at_donation=40)
+	needed = set()
+	for name in selected:
+		needed.update(PLOT_REGISTRY[name]["deps"])
 
-	# Save individual panel figures
-	panels = [
-		(make_fig_distributions, "kidney_model_A_distributions.png", (base_res,)),
-		(make_fig_psa,           "kidney_model_B_psa.png",           (psa_diffs,)),
-		(make_fig_tornado,       "kidney_model_C_tornado.png",       (owsa_res,)),
-		(make_fig_age_subgroup,  "kidney_model_D_age_subgroup.png",  (age_res,)),
-		(make_fig_race_subgroup, "kidney_model_E_race_subgroup.png", (race_res,)),
-	]
-	for make_fn, fname, args in panels:
-		fig = make_fn(*args)
-		path = RESULTS / fname
-		fig.savefig(path, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
-		plt.close()
-		print(f"Figure saved: {path}")
+	ctx = {}
+	# Fixed order so downstream logging always reads base → psa → owsa → age → race → sex
+	for step in ("base", "psa", "owsa", "age", "race", "sex"):
+		if step in needed:
+			ctx[step] = _COMPUTE_STEPS[step](ctx)
 
-	# Save age × race matrix figure
-	matrix_fig = make_age_race_matrix()
-	matrix_path = RESULTS / "kidney_model_age_race_matrix.png"
-	matrix_fig.savefig(matrix_path, dpi=150, bbox_inches="tight",
-					   facecolor=matrix_fig.get_facecolor())
-	plt.close()
-	print(f"Age×race matrix saved: {matrix_path}")
+	for name in selected:
+		entry  = PLOT_REGISTRY[name]
+		result = entry["make"](ctx)
+		path   = RESULTS / entry["file"]
+		if name == "table":
+			result.to_csv(path, index=False)
+			print(f"Results table saved: {path}")
+			print("\n" + result.to_string(index=False))
+		else:
+			result.savefig(path, dpi=150, bbox_inches="tight",
+							facecolor=result.get_facecolor())
+			plt.close()
+			print(f"Figure saved: {path}")
 
-	# Save age × sex matrix figure
-	age_sex_fig  = make_age_sex_matrix()
-	age_sex_path = RESULTS / "kidney_model_age_sex_matrix.png"
-	age_sex_fig.savefig(age_sex_path, dpi=150, bbox_inches="tight",
-						facecolor=age_sex_fig.get_facecolor())
-	plt.close()
-	print(f"Age×sex matrix saved: {age_sex_path}")
-
-	# Save sex × race matrix figure
-	sex_race_fig  = make_sex_race_matrix()
-	sex_race_path = RESULTS / "kidney_model_sex_race_matrix.png"
-	sex_race_fig.savefig(sex_race_path, dpi=150, bbox_inches="tight",
-						 facecolor=sex_race_fig.get_facecolor())
-	plt.close()
-	print(f"Sex×race matrix saved: {sex_race_path}")
-
-	# Save age × race × sex faceted matrix figure
-	ars_fig  = make_age_race_sex_matrix()
-	ars_path = RESULTS / "kidney_model_age_race_sex_matrix.png"
-	ars_fig.savefig(ars_path, dpi=150, bbox_inches="tight",
-					facecolor=ars_fig.get_facecolor())
-	plt.close()
-	print(f"Age×race×sex matrix saved: {ars_path}")
-
-	# Save race figure
-	race_fig = make_race_figure(race_res, age_at_donation=40)
-	race_fig_path = RESULTS / "kidney_model_race.png"
-	race_fig.savefig(race_fig_path, dpi=150, bbox_inches="tight",
-					 facecolor=race_fig.get_facecolor())
-	plt.close()
-	print(f"Race figure saved: {race_fig_path}")
-
-	# Save sex figure
-	sex_fig = make_sex_figure(sex_res)
-	sex_fig_path = RESULTS / "kidney_model_sex.png"
-	sex_fig.savefig(sex_fig_path, dpi=150, bbox_inches="tight",
-					facecolor=sex_fig.get_facecolor())
-	plt.close()
-	print(f"Sex figure saved: {sex_fig_path}")
-
-	# Save results table
-	df = make_results_table(base_res, psa_diffs, owsa_res, age_res, race_res, sex_res)
-	csv_path = RESULTS / "kidney_model_results.csv"
-	df.to_csv(csv_path, index=False)
-	print(f"Results table saved: {csv_path}")
-	print("\n" + df.to_string(index=False))
 	print("\nDone.")
 
 
