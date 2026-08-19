@@ -33,7 +33,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import (load_life_table, load_params, DATA_PROC, RESULTS,
                    weibull_annual_prob, weibull_scale_from_cumrisk_competing,
-                   median_to_annual_tx_prob)
+                   mean_to_annual_tx_prob)
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
 N_PER_ARM = 1_000_000   # cohort size per arm (result is independent of this)
@@ -47,8 +47,8 @@ BASE = load_params()
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def _wl_tx_prob(p, priority: bool) -> float:
-    median_days = p["wl_pld_median_days"] if priority else p["wl_std_median_days"]
-    return float(median_to_annual_tx_prob(float(median_days)))
+    mean_days = p["wl_pld_mean_days"] if priority else p["wl_std_mean_days"]
+    return float(mean_to_annual_tx_prob(float(mean_days)))
 
 
 def _wl_mort(p) -> float:

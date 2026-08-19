@@ -57,7 +57,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import (load_life_table, load_params, DATA_PROC, RESULTS,
                    weibull_annual_prob, weibull_scale_from_cumrisk_competing,
-                   median_to_annual_tx_prob)
+                   mean_to_annual_tx_prob)
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
 N_PER_ARM = 1_000_000
@@ -140,8 +140,8 @@ def run_arm(p: dict, n: float, age_at_entry: int, voucher: bool,
     """
     lt = life_table if life_table is not None else LIFE_TABLE_QX
 
-    median_days = float(p["wl_pld_median_days"] if voucher else p["wl_std_median_days"])
-    wl_tx      = float(median_to_annual_tx_prob(median_days))
+    mean_days = float(p["wl_pld_mean_days"] if voucher else p["wl_std_mean_days"])
+    wl_tx     = float(mean_to_annual_tx_prob(mean_days))
     wl_mort    = _wl_mort(p)
     wl_remove  = float(p["wl_removal_rate_yr"])
     wl_listing = float(p.get("wl_listing_prob", 0.15))
@@ -440,13 +440,13 @@ def main(age_at_entry: int = 40, n: int = N_PER_ARM):
     owsa_scenarios = [
         (
             "Voucher wait time (days)",
-            {"wl_pld_median_days": 200.0}, {"wl_pld_median_days": 50.0},
+            {"wl_pld_mean_days": 288.5}, {"wl_pld_mean_days": 72.1},  # 200d/50d median → mean
             False, False,
         ),
         (
             "Standard wait time (days)",
             # Range = post-KAS250 SWT/LWT center means (Punjala 2024 Table 4)
-            {"wl_std_median_days": 1491.0}, {"wl_std_median_days": 2100.0},
+            {"wl_std_mean_days": 1491.0}, {"wl_std_mean_days": 2100.0},
             False, False,
         ),
         (

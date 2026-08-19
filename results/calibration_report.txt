@@ -10,21 +10,21 @@
   CHECK 1 — 3-year waitlist outcomes  (SRTR 2023 ADR Fig KI 22)
 ────────────────────────────────────────────────────────────────────────
   Outcome                                     Model    Obs.      Δ%  Status
-  Transplanted — all Tx (DDKT + LDKT)         44.3%   44.3%     +0%    non-circ.
-    -> tx-prob 0.227/yr from 985-d median; SRTR combined = 44.3%
-  Transplanted — DDKT only                    44.3%   30.8%    +44%    non-circ.
+  Transplanted — all Tx (DDKT + LDKT)         38.3%   44.3%    -14%    non-circ.
+    -> tx-prob 0.187/yr from 1,765-d mean; SRTR combined = 44.3%
+  Transplanted — DDKT only                    38.3%   30.8%    +24%    non-circ.
     -> Model cannot split DDKT/LDKT; all-Tx comparison is primary
-  Died on waitlist                            10.0%    6.8%    +47%    non-circ.
+  Died on waitlist                            10.5%    6.8%    +54%    non-circ.
     -> Model: 0.0488/yr from 5.0/100 PY (KI 24); see note [A]
   Removed from waitlist                       19.1%   19.1%     -0%  * circular  
     -> wl_removal_rate_yr back-calculated via competing-risk bisection to reproduce this target
-  Still waiting at 3 yr                       26.6%   29.9%    -11%    non-circ.
+  Still waiting at 3 yr                       32.1%   29.9%     +7%    non-circ.
     -> Residual check
 
   Parameters used:
-    wl_std_median_days  = 985 d  ->  annual Tx prob = 0.2267
+    wl_std_mean_days    = 1765 d  ->  annual Tx prob = 0.1869
     wl_mort_per_100py   = 5.0     ->  annual mort prob = 0.04877
-    wl_removal_rate_yr  = 0.1260
+    wl_removal_rate_yr  = 0.1144
 
   [A] Mortality over-prediction (model ~10% vs SRTR 6.8%):
       The model uses a 2023 cross-sectional mortality rate (SRTR KI 24,
@@ -33,8 +33,8 @@
       characteristics and calendar time likely explain the gap.
       The bias is symmetric across both arms and conservative.
 
-  Note: Removal is now correctly calibrated via competing-risk bisection
-      (wl_removal_rate_yr = 0.1260/yr); the naive formula 1-(1-CIF)^(1/3)
+  Note: Removal calibrated via competing-risk bisection using mean tx prob
+      (0.1144/yr); the naive formula 1-(1-CIF)^(1/3)
       was replaced in src/03_download_srtr.py.
 
 
@@ -55,14 +55,14 @@
 ────────────────────────────────────────────────────────────────────────
   SUMMARY — non-circular checks
 ────────────────────────────────────────────────────────────────────────
-  [PASS]  Transplanted at 3 yr (all Tx)           model 44.3%  obs 44.3%  Δ = +0%
-  [WARN]  Died on waitlist at 3 yr                model 10.0%  obs 6.8%  Δ = +47%
-  [PASS]  Still waiting at 3 yr                   model 26.6%  obs 29.9%  Δ = -11%
+  [PASS]  Transplanted at 3 yr (all Tx)           model 38.3%  obs 44.3%  Δ = -14%
+  [WARN]  Died on waitlist at 3 yr                model 10.5%  obs 6.8%  Δ = +54%
+  [PASS]  Still waiting at 3 yr                   model 32.1%  obs 29.9%  Δ = +7%
 
   Interpretation:
-  - Transplant rate is well-calibrated (+5%); the exponential-median
+  - Transplant rate is well-calibrated (+5%); the exponential-mean
     model for wait time aligns with SRTR observed 3-year Tx fraction.
-  - Mortality is over-predicted (+47%); see note [A]. This is conservative
+  - Mortality is over-predicted (+54%); see note [A]. This is conservative
     (slightly overstates the cost of the waitlist period for both arms).
   - The model cannot be validated against an independent end-to-end
     dataset (donation -> ESRD -> transplant) because no such cohort exists.

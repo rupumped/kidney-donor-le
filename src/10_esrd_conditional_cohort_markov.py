@@ -57,7 +57,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import (load_params, DATA_PROC, RESULTS,
-                   median_to_annual_tx_prob, load_life_table)
+                   mean_to_annual_tx_prob, load_life_table)
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
 N_PER_ARM = 1_000_000
@@ -133,8 +133,8 @@ def run_arm(p: dict, n: float, age_at_esrd: int, priority: bool,
     tx_count : float
         Total number transplanted (ever reached PT) as fraction of n.
     """
-    median_days = float(p["wl_pld_median_days"] if priority else p["wl_std_median_days"])
-    wl_tx      = float(median_to_annual_tx_prob(median_days))
+    mean_days = float(p["wl_pld_mean_days"] if priority else p["wl_std_mean_days"])
+    wl_tx     = float(mean_to_annual_tx_prob(mean_days))
     wl_mort    = float(1.0 - np.exp(-p["wl_mort_per_100py"] / 100))
     wl_remove  = float(p["wl_removal_rate_yr"])
     wl_listing = float(p.get("wl_listing_prob", 0.15))
@@ -323,7 +323,7 @@ def make_fig_age_sweep(age_results):
         ax.annotate(f"+{d:.0f}d", xy=(age, d), xytext=(2, 6),
                     textcoords="offset points", fontsize=FS_TICK, color="#2C2C2A")
 
-    ax.set_xlabel("Age at ESRD onset", fontsize=FS_LABEL)
+    ax.set_xlabel("Age at ESRD onset (years)", fontsize=FS_LABEL)
     ax.set_ylabel("LE benefit of priority waitlist (days)", fontsize=FS_LABEL)
     # ax.set_title(
     #     "Priority waitlist LE benefit by age at ESRD onset\n"
@@ -387,13 +387,13 @@ def main(age_at_esrd: int = 60, n: int = N_PER_ARM):
         # (label, lo_overrides, hi_overrides, ldkt_lo, ldkt_hi, dial_scale_lo, dial_scale_hi)
         (
             "Priority wait time (days)",
-            {"wl_pld_median_days": 200.0}, {"wl_pld_median_days": 50.0},
+            {"wl_pld_mean_days": 288.5}, {"wl_pld_mean_days": 72.1},  # 200d/50d median → mean
             False, False, 1.0, 1.0,
         ),
         (
             "Standard wait time (days)",
             # Range = post-KAS250 SWT/LWT center means (Punjala 2024 Table 4)
-            {"wl_std_median_days": 1491.0}, {"wl_std_median_days": 2100.0},
+            {"wl_std_mean_days": 1491.0}, {"wl_std_mean_days": 2100.0},
             False, False, 1.0, 1.0,
         ),
         (

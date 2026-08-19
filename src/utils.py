@@ -103,9 +103,9 @@ def _hardcoded_base_params() -> dict:
 
         # Punjala 2024 (Transplant Proc 56:1740-1751), Table 3 — national mean
         # waiting time at transplant, post-KAS250 (5/2021-4/2022)
-        "wl_std_median_days":       1765,   # 58 months overall
-        # Wainright 2017 AJT 17:1103 + UNOS conference abstract
-        "wl_pld_median_days":       102.6,  # prior living donors post-KAS
+        "wl_std_mean_days":         1765,   # 58 months overall (mean)
+        # Wainright 2017 AJT 17:1103; median 102.6 d → mean = 102.6/ln(2) ≈ 148 d
+        "wl_pld_mean_days":         148.0,  # prior living donors post-KAS (mean)
 
         # SRTR 2023 ADR Figure KI 22: 3-yr removal CIF = 19.06%.
         # Back-calculated via competing-risk bisection (see 03_download_srtr.py
@@ -255,7 +255,15 @@ def weibull_scale_from_cumrisk_competing(
 
 def median_to_annual_tx_prob(median_days: float) -> float:
     """Convert median waiting time (days) to annual transplant probability
-    under an exponential waiting-time model."""
+    under an exponential waiting-time model (rate = ln2/median)."""
     median_yrs = median_days / 365.25
     rate = np.log(2) / median_yrs
+    return float(1.0 - np.exp(-rate))
+
+
+def mean_to_annual_tx_prob(mean_days: float) -> float:
+    """Convert mean waiting time (days) to annual transplant probability
+    under an exponential waiting-time model (rate = 1/mean; Sonnenberg & Beck 1993)."""
+    mean_yrs = mean_days / 365.25
+    rate = 1.0 / mean_yrs
     return float(1.0 - np.exp(-rate))

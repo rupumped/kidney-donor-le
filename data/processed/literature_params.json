@@ -30,6 +30,7 @@
     "hr_black_race": 2.96,
     "hr_male_sex": 1.88,
     "hr_age_per_10yr_nonblack": 1.4,
+    "hr_age_per_10yr_nondonor": 1.4,
     "esrd_cum_incidence_5yr_per10k": 1.0,
     "esrd_cum_incidence_10yr_per10k": 6.0,
     "esrd_cum_incidence_15yr_per10k": 16.0,
@@ -67,10 +68,12 @@
     "_note": "Donors had LOWER long-term all-cause mortality than matched controls in this US study, reflecting healthy-donor selection. HR=1.0 is the appropriate base case; the Mj\u00f8en HR=1.30 is the pessimistic scenario."
   },
   "grams2018_meta": {
-    "hr_all_cause_mortality": null,
+    "hr_all_cause_mortality": 0.984,
+    "hr_all_cause_mortality_ci_lo": 0.743,
+    "hr_all_cause_mortality_ci_hi": 1.302,
     "hr_cvd": null,
     "hr_hypertension": null,
     "hr_type2_diabetes": null,
-    "_finding": "No evidence of higher risk for all-cause mortality, CVD, hypertension, T2DM, or adverse psychosocial outcomes in living kidney donors vs nondonor populations. Supports HR=1.0 assumption for base case."
+    "_finding": "All-cause mortality HR 0.984 (95% CI 0.743\u20131.302) \u2014 not significantly elevated vs nondonor populations. No evidence of higher risk for CVD, hypertension, T2DM, or adverse psychosocial outcomes. Supports HR=1.0 base case; CI used to parameterise PSA log-normal distribution."
   }
 }

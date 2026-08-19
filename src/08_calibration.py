@@ -23,7 +23,7 @@ import math
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from utils import load_params, DATA_PROC, RESULTS, median_to_annual_tx_prob
+from utils import load_params, DATA_PROC, RESULTS, mean_to_annual_tx_prob
 
 BASE = load_params()
 W = 72
@@ -64,7 +64,7 @@ def check_waitlist_outcomes():
     Removed     CIRCULAR      wl_removal_rate_yr = 1-(1-0.191)^(1/3) derived
                               from this KI 22 figure; see caveat below.
     """
-    wl_tx   = float(median_to_annual_tx_prob(float(BASE["wl_std_median_days"])))
+    wl_tx   = float(mean_to_annual_tx_prob(float(BASE["wl_std_mean_days"])))
     wl_mort = float(1.0 - math.exp(-float(BASE["wl_mort_per_100py"]) / 100))
     wl_rem  = float(BASE["wl_removal_rate_yr"])
 
@@ -102,7 +102,7 @@ def check_waitlist_outcomes():
              "Residual check"),
         "",
         f"  Parameters used:",
-        f"    wl_std_median_days  = {int(BASE['wl_std_median_days'])} d  "
+        f"    wl_std_mean_days    = {int(BASE['wl_std_mean_days'])} d  "
         f"→  annual Tx prob = {wl_tx:.4f}",
         f"    wl_mort_per_100py   = {BASE['wl_mort_per_100py']:.1f}     "
         f"→  annual mort prob = {wl_mort:.5f}",
@@ -115,9 +115,9 @@ def check_waitlist_outcomes():
         "      characteristics and calendar time likely explain the gap.",
         "      The bias is symmetric across both arms and conservative.",
         "",
-        "  Note: Removal is now correctly calibrated via competing-risk bisection",
-        "      (wl_removal_rate_yr = 0.1260/yr); the naive formula 1-(1-CIF)^(1/3)",
-        "      was replaced in src/03_download_srtr.py.",
+        f"  Note: Removal calibrated via competing-risk bisection using mean tx prob",
+        f"      ({BASE['wl_removal_rate_yr']:.4f}/yr); the naive formula 1-(1-CIF)^(1/3)",
+        f"      was replaced in src/03_download_srtr.py.",
     ]
     return "\n".join(lines)
 
@@ -160,7 +160,7 @@ def check_posttx_survival():
 
 def summary(wl_lines, posttx_lines):
     lines = [_header("SUMMARY — non-circular checks")]
-    wl_tx   = float(median_to_annual_tx_prob(float(BASE["wl_std_median_days"])))
+    wl_tx   = float(mean_to_annual_tx_prob(float(BASE["wl_std_mean_days"])))
     wl_mort = float(1.0 - math.exp(-float(BASE["wl_mort_per_100py"]) / 100))
     wl_rem  = float(BASE["wl_removal_rate_yr"])
     WL = 1.0; cum_tx = cum_died = cum_rem = 0.0
@@ -185,7 +185,7 @@ def summary(wl_lines, posttx_lines):
     lines += [
         "",
         "  Interpretation:",
-        "  - Transplant rate is well-calibrated (+5%); the exponential-median",
+        "  - Transplant rate is well-calibrated (+5%); the exponential-mean",
         "    model for wait time aligns with SRTR observed 3-year Tx fraction.",
         f"  - Mortality is over-predicted ({mort_err:+d}%); see note [A]. This is conservative",
         "    (slightly overstates the cost of the waitlist period for both arms).",

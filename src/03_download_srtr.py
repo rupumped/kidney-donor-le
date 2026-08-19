@@ -38,7 +38,7 @@ from pathlib import Path
 
 # Allow running from repo root or src/
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from utils import DATA_RAW, DATA_PROC, median_to_annual_tx_prob
+from utils import DATA_RAW, DATA_PROC, mean_to_annual_tx_prob
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -78,12 +78,12 @@ SRTR_FALLBACK = {
     # Corrected value: ~12.6%/yr reproduces 19.1% at 3 yr in the full model.
     "wl_annual_removal_competing": 0.1260,
 
-    # ── MEDIAN WAIT TIMES ─────────────────────────────────────────────────
+    # ── MEAN WAIT TIMES ───────────────────────────────────────────────────
     # National mean waiting time at transplant, Punjala 2024 (Transplant Proc
     # 56:1740-1751), Table 3: post-KAS250 (5/2021-4/2022) 58 months = 1765 d;
     # pre-KAS250 (8/2018-7/2019) 61 months = 1857 d.
-    "wl_std_median_days": 1765,
-    "wl_std_median_days_prekas250": 1857,
+    "wl_std_mean_days": 1765,
+    "wl_std_mean_days_prekas250": 1857,
     # Prior living donors (PLD) — Wainright 2017 AJT, UNOS abstract 2015
     "wl_pld_median_days_overall": 100,
     "wl_pld_median_days_from_activation": 23,
@@ -331,8 +331,8 @@ def main():
             import math
             wl_mort_a = 1.0 - math.exp(
                 -params.get("pretx_mort_per_100py_overall_2023", 5.0) / 100)
-            wl_tx_a   = float(median_to_annual_tx_prob(
-                float(params.get("wl_std_median_days", 1765))))
+            wl_tx_a   = float(mean_to_annual_tx_prob(
+                float(params.get("wl_std_mean_days", 1765))))
             params["wl_annual_removal_competing"] = _solve_removal_rate(
                 params["wl_3yr_removed_other"], wl_tx_a, wl_mort_a)
 
@@ -467,8 +467,8 @@ def main():
     p = params
     print("\n  Key values written to srtr_params.json:")
     print(f"    Pretx mortality (2023):          {p['pretx_mort_per_100py_overall_2023']:.1f}/100 PY")
-    print(f"    Std wait median (post-KAS250):   {p['wl_std_median_days']} days")
-    print(f"    PLD wait median:                 {p['wl_pld_median_days_overall']} days")
+    print(f"    Std wait mean (post-KAS250):     {p['wl_std_mean_days']} days")
+    print(f"    PLD wait mean (overall):         {p.get('wl_pld_mean_days_overall', 144)} days")
     print(f"    DDKT 5-yr graft surv (18–34):    {p['ddkt_graft_5yr_age1834']:.1%}")
     print(f"    DDKT 5-yr graft surv (35–49):    {p['ddkt_graft_5yr_age3549']:.1%}")
     print(f"    DDKT 5-yr graft surv (50–64):    {p['ddkt_graft_5yr_age5064']:.1%}")

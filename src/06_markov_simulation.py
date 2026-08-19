@@ -55,11 +55,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import (load_life_table, load_params, RESULTS, DATA_PROC,
 				   beta_params_from_mean_se, weibull_annual_prob,
 				   weibull_scale_from_cumrisk, weibull_scale_from_cumrisk_competing,
-				   median_to_annual_tx_prob)
+				   mean_to_annual_tx_prob)
 
 # ── GLOBAL CONSTANTS ──────────────────────────────────────────────────────────
 N_SIM     = 5_000_000   # individuals per arm (base case)
-N_DRAWS   =       200   # PSA parameter draws
+N_DRAWS   =      2000   # PSA parameter draws
 MAX_AGE   =       100
 CYCLE_YRS =       1.0   # annual Markov cycles
 
@@ -128,9 +128,9 @@ def sample_params(rng):
 
 # ── ANNUAL TRANSITION RATES ───────────────────────────────────────────────────
 def waitlist_annual_tx_prob(p, priority: bool):
-	"""Annual probability of receiving a transplant, given median wait time."""
-	median_days = p["wl_pld_median_days"] if priority else p["wl_std_median_days"]
-	return median_to_annual_tx_prob(float(median_days))
+	"""Annual probability of receiving a transplant, given mean wait time."""
+	mean_days = p["wl_pld_mean_days"] if priority else p["wl_std_mean_days"]
+	return mean_to_annual_tx_prob(float(mean_days))
 
 
 def waitlist_annual_mort(p):
@@ -426,7 +426,7 @@ def run_psa(age_at_donation=40, n_draws=N_DRAWS):
 	diffs = []
 
 	for i in range(n_draws):
-		if (i+1) % 50 == 0:
+		if (i+1) % 100 == 0:
 			print(f"  PSA draw {i+1}/{n_draws}")
 		p = sample_params(rng)
 		diffs.append(run_arm_analytic(p, age_at_donation, donor=True)
@@ -447,11 +447,11 @@ def run_owsa(age_at_donation=40):
 		"ESRD RR ×2 vs controls":        {"esrd_15yr_donor_overall": 0.00039 * 2},
 		"ESRD RR ×4 vs controls":        {"esrd_15yr_donor_overall": 0.00039 * 4},
 		"ESRD RR ×11 (Mjøen upper)":     {"esrd_15yr_donor_overall": 0.00039 * 11},
-		"Std wait 24 months":            {"wl_std_median_days": 730},
-		"Std wait 61 months (pre-KAS)":  {"wl_std_median_days": 1857},
-		"PLD wait 50 days (optimistic)": {"wl_pld_median_days": 50},
-		"PLD wait 200 days":             {"wl_pld_median_days": 200},
-		"No priority (PLD=standard)":    {"wl_pld_median_days": 1765},
+		"Std wait 24 months":            {"wl_std_mean_days": 730},
+		"Std wait 61 months (pre-KAS)":  {"wl_std_mean_days": 1857},
+		"PLD wait 50 days (optimistic)": {"wl_pld_mean_days": 72.1},   # 50d median → mean/ln2
+		"PLD wait 200 days":             {"wl_pld_mean_days": 288.5},  # 200d median → mean/ln2
+		"No priority (PLD=standard)":    {"wl_pld_mean_days": 1765},
 		"Dialysis mort +50%":            {"dialysis_annual_mort": 0.255},
 		"Dialysis mort -50%":            {"dialysis_annual_mort": 0.085},
 		"Donor mort HR=1.30 (Mjøen)":    {"donor_mort_hr": 1.30},
@@ -1249,7 +1249,7 @@ def make_age_race_sex_matrix():
 		ax.set_yticks(range(len(races)))
 		ax.set_yticklabels(races, fontsize=FS_TICK)
 		ax.set_xlabel("Age at donation" if is_last else "", fontsize=FS_LABEL)
-		# ax.set_title(sex, fontsize=17, fontweight="bold", color="#2C2C2A", pad=6)
+		ax.set_title(sex, fontsize=17, fontweight="bold", color="#2C2C2A", pad=6)
 		ax.spines[:].set_visible(False)
 		ax.tick_params(length=0)
 

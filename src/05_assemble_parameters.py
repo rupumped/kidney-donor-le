@@ -21,6 +21,7 @@ Output:
 
 import sys
 import json
+import math
 from pathlib import Path
 
 # Allow running from repo root or src/
@@ -101,11 +102,12 @@ def main():
     params["wl_removal_rate_yr"]         = srtr.get("wl_annual_removal_competing", 0.1260)
 
     # Wait times: post-KAS250 figures (RECONCILIATION DECISION 2)
-    params["wl_std_median_days"] = srtr.get("wl_std_median_days", 1765)
-    params["wl_pld_median_days"] = w.get("pld_mwt_days_post_kas", 102.6)
+    params["wl_std_mean_days"] = srtr.get("wl_std_mean_days", 1765)
+    # Punjala 2024 reports PLD median; convert to mean for exponential model (mean = median/ln2)
+    params["wl_pld_mean_days"] = w.get("pld_mwt_days_post_kas", 102.6) / math.log(2)
     # Sensitivity scenarios
-    params["wl_std_median_days_prekas250"] = srtr.get("wl_std_median_days_prekas250", 1857)
-    params["wl_pld_median_days_from_activation"] = w.get("pld_mwt_from_activation", 23.0)
+    params["wl_std_mean_days_prekas250"] = srtr.get("wl_std_mean_days_prekas250", 1857)
+    params["wl_pld_mean_days_from_activation"] = w.get("pld_mwt_from_activation", 23.0) / math.log(2)
 
     # Conditional per-cycle listing probability, calibrated from
     # USRDS 2025 ADR ESRD Ch.7 Figs 7.13/7.15/7.17 (RECONCILIATION DECISION 6)
@@ -235,8 +237,8 @@ def main():
     print(f"  Weibull shape:                {params['weibull_shape']}")
     print(f"  Dialysis 1yr mortality:       {params['dialysis_1yr_mort']:.0%}")
     print(f"  Waitlist mort (overall):      {params['wl_mort_per_100py']:.1f}/100 PY")
-    print(f"  Std wait (median days):       {params['wl_std_median_days']}")
-    print(f"  PLD wait (median days):       {params['wl_pld_median_days']:.1f}")
+    print(f"  Std wait (mean days):         {params['wl_std_mean_days']}")
+    print(f"  PLD wait (mean days):         {params['wl_pld_mean_days']:.1f}")
     print(f"  WL listing prob/yr:           {params['wl_listing_prob']:.0%}")
     print(f"  Post-tx annual mort (overall):{params['posttx_annual_mort']:.1%}")
     print(f"    age 18-34:                  {params['posttx_annual_mort_age1834']:.1%}")
