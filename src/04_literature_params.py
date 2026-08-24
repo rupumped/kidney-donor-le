@@ -13,7 +13,7 @@ Papers covered:
   - Wainright 2017 (AJT 17:1103)      — PLD wait time post-KAS
   - Ibrahim 2009  (NEJM 360:459)       — long-term donor outcomes
   - Segev 2010    (JAMA 303:959)       — perioperative mortality and long-term survival
-  - Grams 2018    (meta-analysis, PubMed 29379948) — all-cause mortality HR
+  - O'Keeffe 2018 (meta-analysis, PubMed 29379948) — all-cause mortality RR
 
 Output:
   data/processed/literature_params.json
@@ -114,17 +114,41 @@ LITERATURE_PARAMS = {
         # we use the same 1.40/decade as an approximation to apply symmetrically.
         "hr_age_per_10yr_nondonor":         1.40,
 
-        # Cumulative incidence by time point (per 10,000 donors)
+        # Cumulative incidence by time point (per 10,000 donors), median curve
         "esrd_cum_incidence_5yr_per10k":    1.0,    # range 1–2
         "esrd_cum_incidence_10yr_per10k":   6.0,    # range 4–11
         "esrd_cum_incidence_15yr_per10k":  16.0,    # range 10–29
         "esrd_cum_incidence_20yr_per10k":  34.0,    # range 20–59
 
+        # Full published distribution (Figure 3 / p. 2751-2752): IQR and 1st/99th
+        # percentile curves of predicted risk across donors. Used to fit the
+        # Weibull shape (and its uncertainty) via cloglog regression — see
+        # fit_weibull_shape_cloglog() in utils.py and 05_assemble_parameters.py.
+        "esrd_cum_incidence_5yr_p01_per10k":    0.2,
+        "esrd_cum_incidence_5yr_p25_per10k":    1.0,
+        "esrd_cum_incidence_5yr_p75_per10k":    2.0,
+        "esrd_cum_incidence_5yr_p99_per10k":    8.0,
+        "esrd_cum_incidence_10yr_p01_per10k":   1.2,
+        "esrd_cum_incidence_10yr_p25_per10k":   4.0,
+        "esrd_cum_incidence_10yr_p75_per10k":  11.0,
+        "esrd_cum_incidence_10yr_p99_per10k":  48.0,
+        "esrd_cum_incidence_15yr_p01_per10k":   3.0,
+        "esrd_cum_incidence_15yr_p25_per10k":  10.0,
+        "esrd_cum_incidence_15yr_p75_per10k":  29.0,
+        "esrd_cum_incidence_15yr_p99_per10k": 125.0,
+        "esrd_cum_incidence_20yr_p01_per10k":   7.0,
+        "esrd_cum_incidence_20yr_p25_per10k":  20.0,
+        "esrd_cum_incidence_20yr_p75_per10k":  59.0,
+        "esrd_cum_incidence_20yr_p99_per10k": 256.0,
+
         "_note": (
-            "The 20-year figure (34/10,000) supports using a Weibull shape > 1 "
-            "(accelerating hazard). Under a constant-hazard model, 15-yr rate of "
-            "16/10,000 implies 20-yr rate of ~21/10,000 — well below the observed 34. "
-            "Use k=1.5 Weibull as base case."
+            "Weibull shape k is fit (not assumed) from the cloglog-linearized CDF "
+            "[ln(-ln(1-I(t))) = k*ln(t) - k*ln(lambda)] applied to the median curve; "
+            "sigma(ln k) is the sample SD of k fit separately to all 5 published "
+            "curves (median, IQR, 1st/99th pct). See 05_assemble_parameters.py. "
+            "The 20-year figure (34/10,000) rules out a constant-hazard (k=1) model: "
+            "a constant hazard fit to the 15-yr rate of 16/10,000 would predict "
+            "~21/10,000 at 20 years, well below the observed 34."
         ),
     },
 
@@ -208,22 +232,24 @@ LITERATURE_PARAMS = {
     },
 
     # ════════════════════════════════════════════════════════════════════════
-    # GRAMS 2018 META-ANALYSIS — Mid- and Long-term Health Risks
+    # O'KEEFFE 2018 META-ANALYSIS — Mid- and Long-term Health Risks
     # PubMed 29379948; Ann Intern Med 2018;168(4):276–284
     # 52 studies, 118,426 donors, 117,656 nondonors; avg follow-up 1–24 yr
     # ════════════════════════════════════════════════════════════════════════
-    "grams2018_meta": {
-        # Pooled all-cause mortality HR from Table 2, pooled estimate across
-        # 9 studies with mortality outcome (subset of the 52 total studies).
-        # HR = 0.984, 95% CI 0.743–1.302 (p=0.91 for heterogeneity).
-        "hr_all_cause_mortality":       0.984,
-        "hr_all_cause_mortality_ci_lo": 0.743,
-        "hr_all_cause_mortality_ci_hi": 1.302,
+    "okeeffe2018_meta": {
+        # Pooled all-cause mortality risk ratio from the primary analysis
+        # (4 studies restricted to NOS>=4 and post-2000 recruitment: Segev 2010,
+        # Garg 2012, Mjoen 2014, Berger 2011; total 1,467/84,495 donors vs.
+        # 3,121/62,484 controls). RR = 0.60, 95% CI 0.31-1.10, confirmed in the
+        # O'Keeffe reply letter (Ann Intern Med 2018;169:265, doi:10.7326/L18-0341).
+        "hr_all_cause_mortality":       0.60,
+        "hr_all_cause_mortality_ci_lo": 0.31,
+        "hr_all_cause_mortality_ci_hi": 1.10,
         "hr_cvd":                  None,    # no significant increase found
         "hr_hypertension":         None,    # no significant increase found
         "hr_type2_diabetes":       None,    # no significant increase found
         "_finding": (
-            "All-cause mortality HR 0.984 (95% CI 0.743–1.302) — not significantly "
+            "All-cause mortality RR 0.60 (95% CI 0.31-1.10) — not significantly "
             "elevated vs nondonor populations. No evidence of higher risk for CVD, "
             "hypertension, T2DM, or adverse psychosocial outcomes. Supports HR=1.0 "
             "base case; CI used to parameterise PSA log-normal distribution."

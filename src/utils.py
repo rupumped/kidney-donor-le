@@ -80,9 +80,16 @@ def _hardcoded_base_params() -> dict:
         "esrd_15yr_nondonor_black": 0.00200,  # sex-avg Black (0.24% M, 0.15% F)
         "esrd_15yr_nondonor_white": 0.00050,  # sex-avg White (0.06% M, 0.04% F)
 
-        # Weibull shape for ESRD hazard accumulation (>1 = accelerating)
-        # Calibrated so integration over 15 yr reproduces Muzaale CIF
-        "weibull_shape":            1.5,
+        # Weibull shape for ESRD hazard accumulation (>1 = accelerating) and its
+        # log-scale PSA sigma: fit via cloglog regression to Massie 2017's five
+        # published cumulative-incidence curves (median, IQR, 1st/99th pct),
+        # not assumed. See massie_weibull_fit() / fit_weibull_shape_cloglog()
+        # above and 05_assemble_parameters.py, which does the same fit from
+        # literature_params.json. The literal curve values below mirror the
+        # massie2017 entry in 04_literature_params.py — kept as this module's
+        # offline fallback should data/processed/ not yet be populated.
+        "weibull_shape":            None,   # placeholder, set below
+        "weibull_shape_log_sigma":  None,   # placeholder, set below
 
         # Massie 2017, JASN 28:2749 — hazard ratios within donor cohort
         "hr_black_race":            2.96,   # 95% CI 2.25–3.89
@@ -157,12 +164,16 @@ def _hardcoded_base_params() -> dict:
         # ── BACKGROUND MORTALITY ──────────────────────────────────────────
         # CDC NVSR Vol 72 No 12 (Nov 2023) — 2021 US life tables
         # Full table loaded separately via load_life_table()
-        # HR for donor all-cause mortality vs matched controls
-        # Muzaale 2014 / Segev 2010 / Grams 2018 meta-analysis: HR ≈ 1.0
-        "donor_mort_hr":            1.0,
-
-        # Mjøen 2014 (Kidney Int 86:162) — upper-bound / sensitivity scenario
-        "donor_mort_hr_mjoeen":     1.30,
+        # Donor all-cause mortality HR, modeled as time-varying: short/medium
+        # follow-up studies (Muzaale 2014, Segev 2010, O'Keeffe 2018 pooled)
+        # show no excess mortality within ~10 years; Mjøen 2014 (median 15 yr
+        # follow-up) found donor/control survival curves separate only after
+        # ~10 years, reaching HR=1.30 (95% CI 1.11-1.52) by ~25 years. See
+        # donor_mort_hr_at() in utils.py.
+        "donor_mort_hr_early":      1.0,
+        "donor_mort_hr_late":       1.30,
+        "donor_mort_hr_t_start":    10.0,
+        "donor_mort_hr_t_end":      15.0,
 
         # ── PREEMPTIVE TRANSPLANT LISTING ─────────────────────────────────
         # One-time branching probability at ESRD onset: listed before dialysis starts.
@@ -170,6 +181,36 @@ def _hardcoded_base_params() -> dict:
         "esrd_preemptive_prob_std": 0.058,   # 5.8% overall (non-donor standard arm)
         "esrd_preemptive_prob_pld": 0.094,   # 9.4% age 18-44 (donor-like cohort)
     }
+
+    # Massie 2017, JASN 28:2749, Figure 3 / p. 2751-2752 — five published
+    # cumulative-incidence-of-ESRD curves (per 10,000 donors) at 5/10/15/20 yr:
+    # median, IQR (25th/75th pct), and 1st/99th pct. Mirrors the massie2017
+    # entry in 04_literature_params.py. weibull_shape/weibull_shape_log_sigma
+    # are fit from these, not assumed — see massie_weibull_fit() above.
+    _massie2017_curves = {
+        "esrd_cum_incidence_5yr_per10k":       1.0,
+        "esrd_cum_incidence_5yr_p01_per10k":   0.2,
+        "esrd_cum_incidence_5yr_p25_per10k":   1.0,
+        "esrd_cum_incidence_5yr_p75_per10k":   2.0,
+        "esrd_cum_incidence_5yr_p99_per10k":   8.0,
+        "esrd_cum_incidence_10yr_per10k":      6.0,
+        "esrd_cum_incidence_10yr_p01_per10k":  1.2,
+        "esrd_cum_incidence_10yr_p25_per10k":  4.0,
+        "esrd_cum_incidence_10yr_p75_per10k": 11.0,
+        "esrd_cum_incidence_10yr_p99_per10k": 48.0,
+        "esrd_cum_incidence_15yr_per10k":     16.0,
+        "esrd_cum_incidence_15yr_p01_per10k":  3.0,
+        "esrd_cum_incidence_15yr_p25_per10k": 10.0,
+        "esrd_cum_incidence_15yr_p75_per10k": 29.0,
+        "esrd_cum_incidence_15yr_p99_per10k": 125.0,
+        "esrd_cum_incidence_20yr_per10k":     34.0,
+        "esrd_cum_incidence_20yr_p01_per10k":  7.0,
+        "esrd_cum_incidence_20yr_p25_per10k": 20.0,
+        "esrd_cum_incidence_20yr_p75_per10k": 59.0,
+        "esrd_cum_incidence_20yr_p99_per10k": 256.0,
+    }
+    params["weibull_shape"], params["weibull_shape_log_sigma"] = \
+        massie_weibull_fit(_massie2017_curves)
 
     # Age-stratified post-year-1 graft failure, derived as
     # 1 - (5yr_surv / 1yr_surv)^(1/4) from the DDKT graft survival above
@@ -211,6 +252,52 @@ def weibull_annual_prob(t: float, lam: float, k: float) -> float:
     return float(np.clip(surv_t - surv_t1, 0.0, 1.0))
 
 
+def fit_weibull_shape_cloglog(times, cum_incidences) -> tuple:
+    """
+    Fit Weibull shape k (and scale lambda) to a cumulative-incidence curve via
+    the complementary log-log linearization of the Weibull CDF:
+
+      I(t) = 1 - exp(-(t/lambda)^k)
+      ln(-ln(1 - I(t))) = k*ln(t) - k*ln(lambda)
+
+    This is linear in ln(t) with slope k, so an OLS fit recovers k directly
+    (closed form, no nonlinear solver). `cum_incidences` are probabilities
+    (not per-10,000 counts).
+    """
+    x = np.log(np.asarray(times, dtype=float))
+    y = np.log(-np.log(1.0 - np.asarray(cum_incidences, dtype=float)))
+    slope, intercept = np.polyfit(x, y, 1)
+    k   = float(slope)
+    lam = float(np.exp(-intercept / slope))
+    return k, lam
+
+
+def massie_weibull_fit(massie: dict) -> tuple:
+    """
+    Fit Weibull shape k and its log-scale PSA sigma from Massie 2017's five
+    published cumulative-incidence curves (median, IQR, 1st/99th percentile;
+    see fit_weibull_shape_cloglog). `massie` is the massie2017 dict from
+    literature_params.json (or an equivalent literal mirror), keyed by
+    esrd_cum_incidence_{t}yr[_p{pct}]_per10k for t in (5, 10, 15, 20).
+
+    k is the fit to the median curve; sigma is the sample SD of ln(k) across
+    all 5 independently-fit curves, capturing how consistently a single
+    Weibull shape describes the whole published risk distribution.
+    """
+    times = (5, 10, 15, 20)
+    curve_suffixes = {"p01": "_p01", "p25": "_p25", "p50": "",
+                       "p75": "_p75", "p99": "_p99"}
+    ks = {}
+    for label, suffix in curve_suffixes.items():
+        vals = [massie[f"esrd_cum_incidence_{t}yr{suffix}_per10k"] / 10_000.0
+                 for t in times]
+        k, _ = fit_weibull_shape_cloglog(times, vals)
+        ks[label] = k
+    k_hat = ks["p50"]
+    sigma = float(np.std(np.log(list(ks.values())), ddof=1))
+    return k_hat, sigma
+
+
 def weibull_scale_from_cumrisk(cum_risk_15: float, k: float) -> float:
     """
     Return Weibull scale lambda such that:
@@ -219,27 +306,50 @@ def weibull_scale_from_cumrisk(cum_risk_15: float, k: float) -> float:
     return 15.0 / (-np.log(1.0 - cum_risk_15)) ** (1.0 / k)
 
 
+def donor_mort_hr_at(t: float, hr_early: float = 1.0, hr_late: float = 1.30,
+                      t_start: float = 10.0, t_end: float = 25.0) -> float:
+    """
+    Donor all-cause mortality HR as a function of years since donation.
+
+    Flat at hr_early for t <= t_start (no excess mortality detectable in the
+    short/medium-follow-up literature, e.g. Segev 2010, Garg 2012), ramping
+    linearly to hr_late by t_end (Mjøen 2014's finding that donor and control
+    survival curves separate only after ~10 years, reaching HR=1.30 by their
+    median ~15-25 yr follow-up), then flat at hr_late thereafter.
+    """
+    if t <= t_start:
+        return hr_early
+    if t >= t_end:
+        return hr_late
+    frac = (t - t_start) / (t_end - t_start)
+    return hr_early + frac * (hr_late - hr_early)
+
+
 def weibull_scale_from_cumrisk_competing(
     cum_risk_15: float,
     k: float,
     life_table_qx: np.ndarray,
     age_at_entry: int,
-    bg_hr: float = 1.0,
+    bg_hr=1.0,
 ) -> float:
     """
     Return Weibull scale lambda calibrated so the competing-risk-adjusted
     15-year ESRD CIF equals cum_risk_15.
 
     Accounts for background mortality depleting the ESRD-susceptible pool each
-    year; uses the same life table and bg_hr as the main simulation.
+    year; uses the same life table and bg_hr as the main simulation. bg_hr may
+    be a fixed scalar or a callable bg_hr(t) giving the HR t years after entry
+    (e.g. donor_mort_hr_at), to support a time-varying background HR.
     Solved by bisection (60 iterations → precision < 1e-12 for typical inputs).
     """
+    bg_hr_fn = bg_hr if callable(bg_hr) else (lambda t: bg_hr)
+
     def cr_cif(lam: float) -> float:
         cif, s_bg = 0.0, 1.0
         for t in range(15):
             cif += s_bg * weibull_annual_prob(t, lam, k)
             age  = min(age_at_entry + t, len(life_table_qx) - 1)
-            s_bg *= 1.0 - life_table_qx[age] * bg_hr
+            s_bg *= 1.0 - life_table_qx[age] * bg_hr_fn(t)
         return cif
 
     # cr_cif is monotonically decreasing in lam

@@ -3,36 +3,50 @@
 
 \begin{table*}[ht]
 	\centering
-	\caption{\textbf{One-way sensitivity analysis:} parameter values tested and the resulting change in life expectancy (donor arm minus non-donor arm), age~40 at donation, all other parameters held at base-case values. Negative $\Delta$LE values indicate a net life-expectancy cost of donation relative to the matched non-donor arm under the value tested; positive values indicate a donor-arm benefit. The ``$8\times$ controls (base case)'' row reproduces the overall base-case result reported in the main results ($\Delta$LE~$=-40.4$~d).}
+	\caption{\textbf{One-way sensitivity analysis:} parameter values tested and the resulting change in life expectancy (donor arm minus non-donor arm), age~40 at donation, all other parameters held at base-case values, including the donor all-cause mortality HR, which is held at its base-case time-varying profile rather than perturbed here (see Table~\ref{tab:hr-structural} and Figure~\ref{fig:hr_scenarios} for sensitivity to that assumption). Negative $\Delta\text{LE}$ values indicate a net life-expectancy cost of donation relative to the matched non-donor arm under the value tested; positive values indicate a donor-arm benefit. The ``$8\times$ controls (base case)'' row reproduces the overall base-case result reported in the main results ($\Delta\text{LE}~=-909.3$~d).}
 	\label{tab:owsa}
 	\begin{tabular}{lrr}
-	\hline
-	Parameter (value tested) & $\Delta$LE (days) & vs.\ base (days) \\
-	\hline
+	\toprule
+	Parameter (value tested) & $\Delta\text{LE}$ (days) & vs.\ base (days) \\
+	\midrule
 	\multicolumn{3}{l}{\textit{ESRD relative risk, donor vs.\ non-donor (base case: $8\times$, 30.8/10{,}000)}} \\
-	\quad $2\times$ controls & $-5.7$ & $+34.7$ \\
-	\quad $4\times$ controls & $-17.5$ & $+22.9$ \\
-	\quad $8\times$ controls (base case) & $-40.4$ & 0.0 \\
-	\quad $11\times$ controls (Mjøen upper bound) & $-58.6$ & $-18.2$ \\
-	\hline
+	\quad $2\times$ controls & $-867.8$ & $+41.5$ \\
+	\quad $4\times$ controls & $-880.4$ & $+28.9$ \\
+	\quad $8\times$ controls (base case) & $-909.3$ & 0.0 \\
+	\quad $11\times$ controls (Mjøen upper bound) & $-932.3$ & $-23.0$ \\
+	\midrule
 	\multicolumn{3}{l}{\textit{Standard waitlist mean wait (base case: 1{,}765~d)}} \\
-	\quad 24 months (730~d) & $-40.5$ & $-0.1$ \\
-	\quad 61 months (1{,}857~d, pre-KAS250) & $-40.4$ & 0.0 \\
-	\hline
+	\quad 24 months (730~d) & $-909.3$ & 0.0 \\
+	\quad 61 months (1{,}857~d, pre-KAS250) & $-909.3$ & 0.0 \\
+	\midrule
 	\multicolumn{3}{l}{\textit{Priority (PLD) waitlist mean wait (base case: $\approx 148$~d, from 102.6~d median via $\mu=\text{median}/\ln 2$)}} \\
-	\quad 50~d median ($\approx 72$~d mean, optimistic) & $-40.4$ & 0.0 \\
-	\quad 200~d median ($\approx 289$~d mean) & $-40.5$ & $-0.1$ \\
-	\quad No priority access (PLD~$=$~standard, 1{,}765~d mean) & $-41.1$ & $-0.7$ \\
-	\hline
+	\quad 50~d median ($\approx 72$~d mean, optimistic) & $-909.3$ & 0.0 \\
+	\quad 200~d median ($\approx 289$~d mean) & $-909.4$ & $-0.1$ \\
+	\quad No priority access (PLD~$=$~standard, 1{,}765~d mean) & $-909.5$ & $-0.2$ \\
+	\midrule
 	\multicolumn{3}{l}{\textit{Dialysis annual mortality (base case: 17\%)}} \\
-	\quad $-50\%$ (8.5\%) & $-25.7$ & $+14.7$ \\
-	\quad $+50\%$ (25.5\%) & $-47.8$ & $-7.4$ \\
-	\hline
-	\multicolumn{3}{l}{\textit{Donor all-cause mortality HR (base case: 1.0)}} \\
-	\quad HR~=~1.30 (Mjøen pessimistic) & $-1{,}069.9$ & $-1{,}029.5$ \\
-	\hline
+	\quad $-50\%$ (8.5\%) & $-873.4$ & $+35.9$ \\
+	\quad $+50\%$ (25.5\%) & $-927.3$ & $-18.0$ \\
+	\midrule
 	\multicolumn{3}{l}{\textit{Post-transplant survival (base case: DDKT quality)}} \\
-	\quad LDKT quality (SRTR Figure~KI~76) & $-32.4$ & $+8.0$ \\
-	\hline
+	\quad LDKT quality (SRTR Figure~KI~76) & $-889.8$ & $+19.5$ \\
+	\bottomrule
+	\end{tabular}
+\end{table*}
+
+\begin{table*}[ht]
+	\centering
+	\caption{\textbf{Structural sensitivity: donor mortality hazard ratio.} $\Delta\text{LE}$ under the base-case time-varying HR profile versus a flat HR taken from each individual published estimate and applied for the donor's entire remaining lifetime, age~40 at donation. Unlike Table~\ref{tab:owsa}, this range reflects a genuine disagreement about model structure (whether, and when, donor mortality risk rises) rather than sampling uncertainty.}
+	\label{tab:hr-structural}
+	\begin{tabular}{lr}
+	\toprule
+	HR assumption & $\Delta\text{LE}$ (days) \\
+	\midrule
+	HR~$=0.60$ flat (O'Keeffe et~al.\ 2018 pooled estimate) & $+1{,}855.8$ \\
+	HR~$=1.00$ flat (no excess mortality) & $-68.3$ \\
+	HR $1.00\rightarrow 1.30$, years 10--15 (base case) & $-909.3$ \\
+	HR~$=1.30$ flat (Mjøen et~al.\ 2014 point estimate) & $-1{,}084.5$ \\
+	HR~$=1.52$ flat (Mjøen et~al.\ 2014 upper 95\%~CI) & $-1{,}694.0$ \\
+	\bottomrule
 	\end{tabular}
 \end{table*}

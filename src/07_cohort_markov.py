@@ -33,7 +33,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import (load_life_table, load_params, DATA_PROC, RESULTS,
                    weibull_annual_prob, weibull_scale_from_cumrisk_competing,
-                   mean_to_annual_tx_prob)
+                   mean_to_annual_tx_prob, donor_mort_hr_at)
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
 N_PER_ARM = 1_000_000   # cohort size per arm (result is independent of this)
@@ -92,7 +92,13 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool, life_table=None):
     wl_listing   = float(p.get("wl_listing_prob", 1.0))
     dial_mort1   = float(p["dialysis_1yr_mort"])
     dial_mort    = float(p["dialysis_annual_mort"])
-    bg_hr        = float(p.get("donor_mort_hr", 1.0)) if donor else 1.0
+    bg_hr_fn     = (lambda t: donor_mort_hr_at(
+        t,
+        p.get("donor_mort_hr_early", 1.0),
+        p.get("donor_mort_hr_late", 1.30),
+        p.get("donor_mort_hr_t_start", 10.0),
+        p.get("donor_mort_hr_t_end", 15.0),
+    )) if donor else (lambda t: 1.0)
     preemptive_p = float(p.get(
         "esrd_preemptive_prob_pld" if donor else "esrd_preemptive_prob_std", 0.0))
 
@@ -100,7 +106,7 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool, life_table=None):
     cum_risk_15 = float(p["esrd_15yr_donor_overall"] if donor else p["esrd_15yr_nondonor"])
     wbl_k   = float(p["weibull_shape"])
     wbl_lam = weibull_scale_from_cumrisk_competing(
-        cum_risk_15, wbl_k, lt, age_at_entry, bg_hr
+        cum_risk_15, wbl_k, lt, age_at_entry, bg_hr_fn
     )
 
     # Initial state vector — everyone healthy
@@ -118,7 +124,7 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool, life_table=None):
         age = age_at_entry + yr
 
         # ── Year-varying transition probabilities ──────────────────────────
-        q_bg   = lt[min(age, MAX_AGE)] * bg_hr
+        q_bg   = lt[min(age, MAX_AGE)] * bg_hr_fn(yr)
         p_esrd = weibull_annual_prob(float(yr), wbl_lam, wbl_k)
         ptx_m  = _ptx_mort(p, age)
         graft_fail = _graft_fail_rate(p, age)

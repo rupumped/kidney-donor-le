@@ -35,7 +35,23 @@
     "esrd_cum_incidence_10yr_per10k": 6.0,
     "esrd_cum_incidence_15yr_per10k": 16.0,
     "esrd_cum_incidence_20yr_per10k": 34.0,
-    "_note": "The 20-year figure (34/10,000) supports using a Weibull shape > 1 (accelerating hazard). Under a constant-hazard model, 15-yr rate of 16/10,000 implies 20-yr rate of ~21/10,000 \u2014 well below the observed 34. Use k=1.5 Weibull as base case."
+    "esrd_cum_incidence_5yr_p01_per10k": 0.2,
+    "esrd_cum_incidence_5yr_p25_per10k": 1.0,
+    "esrd_cum_incidence_5yr_p75_per10k": 2.0,
+    "esrd_cum_incidence_5yr_p99_per10k": 8.0,
+    "esrd_cum_incidence_10yr_p01_per10k": 1.2,
+    "esrd_cum_incidence_10yr_p25_per10k": 4.0,
+    "esrd_cum_incidence_10yr_p75_per10k": 11.0,
+    "esrd_cum_incidence_10yr_p99_per10k": 48.0,
+    "esrd_cum_incidence_15yr_p01_per10k": 3.0,
+    "esrd_cum_incidence_15yr_p25_per10k": 10.0,
+    "esrd_cum_incidence_15yr_p75_per10k": 29.0,
+    "esrd_cum_incidence_15yr_p99_per10k": 125.0,
+    "esrd_cum_incidence_20yr_p01_per10k": 7.0,
+    "esrd_cum_incidence_20yr_p25_per10k": 20.0,
+    "esrd_cum_incidence_20yr_p75_per10k": 59.0,
+    "esrd_cum_incidence_20yr_p99_per10k": 256.0,
+    "_note": "Weibull shape k is fit (not assumed) from the cloglog-linearized CDF [ln(-ln(1-I(t))) = k*ln(t) - k*ln(lambda)] applied to the median curve; sigma(ln k) is the sample SD of k fit separately to all 5 published curves (median, IQR, 1st/99th pct). See 05_assemble_parameters.py. The 20-year figure (34/10,000) rules out a constant-hazard (k=1) model: a constant hazard fit to the 15-yr rate of 16/10,000 would predict ~21/10,000 at 20 years, well below the observed 34."
   },
   "mjoeen2014": {
     "hr_all_cause_mortality": 1.3,
@@ -67,13 +83,13 @@
     "hr_long_term_all_cause_mort": 0.85,
     "_note": "Donors had LOWER long-term all-cause mortality than matched controls in this US study, reflecting healthy-donor selection. HR=1.0 is the appropriate base case; the Mj\u00f8en HR=1.30 is the pessimistic scenario."
   },
-  "grams2018_meta": {
-    "hr_all_cause_mortality": 0.984,
-    "hr_all_cause_mortality_ci_lo": 0.743,
-    "hr_all_cause_mortality_ci_hi": 1.302,
+  "okeeffe2018_meta": {
+    "hr_all_cause_mortality": 0.6,
+    "hr_all_cause_mortality_ci_lo": 0.31,
+    "hr_all_cause_mortality_ci_hi": 1.1,
     "hr_cvd": null,
     "hr_hypertension": null,
     "hr_type2_diabetes": null,
-    "_finding": "All-cause mortality HR 0.984 (95% CI 0.743\u20131.302) \u2014 not significantly elevated vs nondonor populations. No evidence of higher risk for CVD, hypertension, T2DM, or adverse psychosocial outcomes. Supports HR=1.0 base case; CI used to parameterise PSA log-normal distribution."
+    "_finding": "All-cause mortality RR 0.60 (95% CI 0.31-1.10) \u2014 not significantly elevated vs nondonor populations. No evidence of higher risk for CVD, hypertension, T2DM, or adverse psychosocial outcomes. Supports HR=1.0 base case; CI used to parameterise PSA log-normal distribution."
   }
 }

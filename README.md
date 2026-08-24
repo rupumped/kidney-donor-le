@@ -139,26 +139,26 @@ after any parameter changes). Base-case results:
 
 | Analysis | LE Donor (yr) | LE Non-donor (yr) | ΔLE (days) |
 |----------|--------------|-------------------|------------|
-| Base case (age 40, overall) | 38.05 | 38.15 | −38.3 |
-| Age 25 | 51.64 | 51.77 | −47.4 |
-| Age 35 | 42.52 | 42.63 | −41.8 |
-| Age 45 | 33.67 | 33.75 | −31.0 |
-| Age 55 | 25.27 | 25.31 | −17.3 |
-| Race: White | 38.08 | 38.15 | −25.1 |
-| Race: Black | 37.87 | 38.09 | −73.4 |
-| Sex: Female | 40.45 | 40.48 | −29.9 |
-| Sex: Male | 35.97 | 36.09 | −43.6 |
-| Sensitivity: Donor mort HR=1.30 (Mjøen) | — | — | −1067.9 |
-| Sensitivity: Post-Tx LDKT quality | — | — | −22.7 |
+| Base case (age 40, overall) | 35.63 | 38.14 | −914.3 |
+| Age 25 | 48.65 | 51.75 | −1131.6 |
+| Age 35 | 39.90 | 42.62 | −991.5 |
+| Age 45 | 31.51 | 33.74 | −814.0 |
+| Age 55 | 23.69 | 25.31 | −591.2 |
+| Race: White | 35.68 | 38.13 | −892.5 |
+| Race: Black | 35.39 | 38.01 | −950.7 |
+| Sex: Female | 38.08 | 40.46 | −888.3 |
+| Sex: Male | 33.55 | 36.07 | −915.9 |
+| Sensitivity: Donor mort HR=1.30 flat (Mjøen) | — | — | −1084.5 |
+| Sensitivity: Post-Tx LDKT quality | — | — | −889.8 |
 
 Key takeaways:
-- **Priority offsets** only ~0.6 days of the ESRD risk cost (base case −38.3 vs no-priority −38.9 days)
-- **Dominant cost:** Post-transplant survival gap (~3–7%/yr mortality vs healthy peers depending on age) — unaffected by allocation policy
-- **Age pattern:** Net harm is greatest for young donors and approaches zero by age 55
-- **Race:** Black donors bear substantially more absolute ESRD cost than white donors (−73 vs −25 days)
-- **Critical uncertainty:** If Mjøen 2014 all-cause mortality HR (1.30) is correct rather than Muzaale/US data (HR ≈ 1.0), net harm increases to ~3 years
-- **LDKT vs DDKT:** If post-Tx survival at LDKT quality, harm falls to −23 days (vs −38 base)
-- **PSA:** P(donation beneficial) ≈ 48%; mean ΔLE +29.5 days [−1086, +1068] reflecting this uncertainty
+- **Priority offsets** only ~0.2 days of the ESRD risk cost (base case −909.3 vs no-priority −909.5 days)
+- **Dominant cost:** Time-varying donor all-cause mortality HR (flat at 1.0 through year 10, ramping to Mjøen's 1.30 by year 15) — unaffected by allocation policy
+- **Age pattern:** Net harm is greatest for young donors and falls substantially by age 55, since a younger donor spends more of their remaining life under the elevated HR
+- **Race:** Black donors bear somewhat more cost than white donors (−951 vs −893 days at age 40), though this ESRD-driven gap is now a minor contributor next to the mortality-HR effect
+- **Critical uncertainty:** The donor mortality HR assumption dominates every other source of uncertainty — holding it flat at the literature's individual point estimates ranges from a multi-year *benefit* (HR=0.60, O'Keeffe pooled estimate) to a cost exceeding 4.6 years (HR=1.52, Mjøen upper 95% CI)
+- **LDKT vs DDKT:** If post-Tx survival at LDKT quality, harm falls to −889.8 days (vs −909.3 base)
+- **PSA:** P(donation beneficial) = 0%; mean ΔLE −910.8 days [−936.1, −889.3], reflecting narrow residual uncertainty once the mortality HR is held fixed at its base-case time-varying profile
 
 ## Testing
 

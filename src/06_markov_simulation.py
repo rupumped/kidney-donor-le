@@ -55,7 +55,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import (load_life_table, load_params, RESULTS, DATA_PROC,
 				   beta_params_from_mean_se, weibull_annual_prob,
 				   weibull_scale_from_cumrisk, weibull_scale_from_cumrisk_competing,
-				   mean_to_annual_tx_prob)
+				   mean_to_annual_tx_prob, donor_mort_hr_at)
 
 # ── GLOBAL CONSTANTS ──────────────────────────────────────────────────────────
 N_SIM     = 5_000_000   # individuals per arm (base case)
@@ -103,9 +103,12 @@ def sample_params(rng):
 	p["esrd_15yr_donor_black"]   = beta_sample("esrd_15yr_donor_black",   0.20)  # CI 47.8–105.8/10k → SE 20%
 	p["esrd_15yr_donor_white"]   = beta_sample("esrd_15yr_donor_white",   0.16)  # CI 15.6–30.1/10k → SE 16%
 
-	# Weibull shape: no published CI; log-normal σ=0.13 is an assumed scenario
-	# range (Massie 2017 gives point estimates only; k is calibrated, not fitted)
-	p["weibull_shape"] = float(np.exp(rng.normal(np.log(1.5), 0.13)))
+	# Weibull shape: log-normal around the cloglog-fit point estimate, with sigma
+	# the sample SD of ln(k) fit separately to Massie 2017's 5 published
+	# cumulative-incidence curves (median, IQR, 1st/99th pct) — both derived in
+	# 05_assemble_parameters.py via massie_weibull_fit(), not assumed.
+	p["weibull_shape"] = float(np.exp(rng.normal(
+		np.log(BASE["weibull_shape"]), BASE["weibull_shape_log_sigma"])))
 
 	# Registry-derived parameters (SRTR, USRDS) have negligible sampling SE and
 	# are left at their base-case values.  Scenario variation is handled by the
@@ -116,12 +119,13 @@ def sample_params(rng):
 	# 95% CrI of roughly [0.03, 0.27], consistent with the acknowledged range.
 	p["wl_listing_prob"] = beta_sample("wl_listing_prob", 0.40)
 
-	# Donor mortality HR: log-normal calibrated to Grams 2018 meta-analysis
-	# (PMID 29379948; Ann Intern Med 2018;168:276–284; 52 studies, 118,426 donors).
-	# All-cause mortality pooled HR ≈ 0.984 (95% CI 0.743–1.302) vs nondonors.
-	# mu  = [ln(0.743) + ln(1.302)] / 2 = -0.016
-	# sigma = [ln(1.302) - ln(0.743)] / (2 × 1.96) = 0.143
-	p["donor_mort_hr"] = float(np.exp(rng.normal(-0.016, 0.143)))
+	# Donor mortality HR is NOT sampled in the PSA: the disagreement across
+	# studies (Segev/Garg/Berger show no excess mortality; Mjøen shows HR=1.30
+	# but only after ~10 years of follow-up) reflects non-proportional hazards
+	# (a time-varying effect) rather than sampling uncertainty about one fixed
+	# number, so it is treated as a structural assumption (see
+	# donor_mort_hr_at() / donor_mort_hr_early / donor_mort_hr_late in the base
+	# parameters) rather than a PSA-distributed parameter.
 
 	return p
 
@@ -183,12 +187,22 @@ def simulate_cohort(p, n, age_at_entry, donor: bool, rng, life_table=None):
 	ly      = np.zeros(n)                         # life-years accumulated
 	alive   = np.ones(n, dtype=bool)
 
+	# Donor mortality HR is time-varying (flat until donor_mort_hr_t_start
+	# years post-donation, ramping to donor_mort_hr_late by donor_mort_hr_t_end;
+	# see donor_mort_hr_at()); the non-donor arm always uses HR=1.0.
+	bg_hr_fn = (lambda t: donor_mort_hr_at(
+		t,
+		p.get("donor_mort_hr_early", 1.0),
+		p.get("donor_mort_hr_late", 1.30),
+		p.get("donor_mort_hr_t_start", 10.0),
+		p.get("donor_mort_hr_t_end", 15.0),
+	)) if donor else (lambda t: 1.0)
+
 	# Pre-compute competing-risk-calibrated Weibull scale for this cohort
 	cum_risk_15 = p["esrd_15yr_donor_overall"] if donor else p["esrd_15yr_nondonor"]
 	wbl_k   = p["weibull_shape"]
 	wbl_lam = weibull_scale_from_cumrisk_competing(
-		cum_risk_15, wbl_k, lt, int(age_at_entry),
-		p.get("donor_mort_hr", 1.0) if donor else 1.0
+		cum_risk_15, wbl_k, lt, int(age_at_entry), bg_hr_fn
 	)
 
 	# Pre-compute age-independent transition probabilities
@@ -201,7 +215,6 @@ def simulate_cohort(p, n, age_at_entry, donor: bool, rng, life_table=None):
 
 	dial_mort1 = p["dialysis_1yr_mort"]   # first year on dialysis
 	dial_mort  = p["dialysis_annual_mort"]
-	bg_hr      = p.get("donor_mort_hr", 1.0) if donor else 1.0
 
 	# One-time preemptive listing probability at ESRD onset (USRDS 2025 Fig 7.13)
 	preemptive_p = float(p.get(
@@ -215,7 +228,7 @@ def simulate_cohort(p, n, age_at_entry, donor: bool, rng, life_table=None):
 		a = int(age_at_entry) + yr
 
 		# Background mortality this cycle (all states)
-		q_bg = lt[min(a, MAX_AGE)] * bg_hr
+		q_bg = lt[min(a, MAX_AGE)] * bg_hr_fn(yr)
 
 		u = rng.random((n, 6))  # draws for each possible event
 
@@ -328,14 +341,20 @@ def run_arm_analytic(p, age_at_entry: int, donor: bool, life_table=None) -> floa
 	wl_listing    = float(p.get("wl_listing_prob", 1.0))
 	dial_mort1    = float(p["dialysis_1yr_mort"])
 	dial_mort     = float(p["dialysis_annual_mort"])
-	bg_hr         = float(p.get("donor_mort_hr", 1.0)) if donor else 1.0
+	bg_hr_fn      = (lambda t: donor_mort_hr_at(
+		t,
+		p.get("donor_mort_hr_early", 1.0),
+		p.get("donor_mort_hr_late", 1.30),
+		p.get("donor_mort_hr_t_start", 10.0),
+		p.get("donor_mort_hr_t_end", 15.0),
+	)) if donor else (lambda t: 1.0)
 	preemptive_p  = float(p.get(
 		"esrd_preemptive_prob_pld" if donor else "esrd_preemptive_prob_std", 0.0))
 
 	cum_risk_15 = float(p["esrd_15yr_donor_overall"] if donor else p["esrd_15yr_nondonor"])
 	wbl_k   = float(p["weibull_shape"])
 	wbl_lam = weibull_scale_from_cumrisk_competing(
-		cum_risk_15, wbl_k, lt, age_at_entry, bg_hr
+		cum_risk_15, wbl_k, lt, age_at_entry, bg_hr_fn
 	)
 
 	H, D1, D2, WL, PT = 1.0, 0.0, 0.0, 0.0, 0.0
@@ -344,7 +363,7 @@ def run_arm_analytic(p, age_at_entry: int, donor: bool, life_table=None) -> floa
 
 	while H + D1 + D2 + WL + PT > 1e-9:
 		age    = age_at_entry + yr
-		q_bg   = lt[min(age, MAX_AGE)] * bg_hr
+		q_bg   = lt[min(age, MAX_AGE)] * bg_hr_fn(yr)
 		p_esrd = weibull_annual_prob(float(yr), wbl_lam, wbl_k)
 
 		if age < 35:   ptx_mort = float(p.get("posttx_annual_mort_age1834", p["posttx_annual_mort"]))
@@ -433,8 +452,9 @@ def run_psa(age_at_donation=40, n_draws=N_DRAWS):
 					 - run_arm_analytic(p, age_at_donation, donor=False))
 
 	diffs = np.array(diffs)
-	print(f"  PSA ΔLE: mean={diffs.mean():+.3f}, "
-		  f"95% CrI [{np.percentile(diffs,2.5):+.3f}, {np.percentile(diffs,97.5):+.3f}]")
+	print(f"  PSA ΔLE: mean={diffs.mean():+.3f} yr ({diffs.mean()*365.25:+.1f} d), "
+		  f"95% CrI [{np.percentile(diffs,2.5):+.3f}, {np.percentile(diffs,97.5):+.3f}] yr "
+		  f"([{np.percentile(diffs,2.5)*365.25:+.1f}, {np.percentile(diffs,97.5)*365.25:+.1f}] d)")
 	print(f"  P(donation beneficial): {(diffs > 0).mean():.1%}")
 	return diffs
 
@@ -454,7 +474,6 @@ def run_owsa(age_at_donation=40):
 		"No priority (PLD=standard)":    {"wl_pld_mean_days": 1765},
 		"Dialysis mort +50%":            {"dialysis_annual_mort": 0.255},
 		"Dialysis mort -50%":            {"dialysis_annual_mort": 0.085},
-		"Donor mort HR=1.30 (Mjøen)":    {"donor_mort_hr": 1.30},
 		# Post-Tx survival: LDKT quality vs base-case DDKT (SRTR 2023 ADR Fig KI 76)
 		"Post-Tx: LDKT quality":         {
 			"posttx_annual_mort_age1834": BASE.get("posttx_ld_annual_mort_age1834", 0.0042),
@@ -473,6 +492,46 @@ def run_owsa(age_at_donation=40):
 			 - run_arm_analytic(p, age_at_donation, donor=False)
 		results[label] = diff
 		print(f"  {label:<44} ΔLE = {diff:+.3f} yr  ({diff*365.25:+.1f} days)")
+
+	return results
+
+
+# ── STRUCTURAL SENSITIVITY: DONOR MORTALITY HR SCENARIOS ─────────────────────
+def run_hr_scenarios(age_at_donation=40):
+	"""
+	Donor all-cause mortality HR is treated as a fixed structural assumption
+	(flat 1.0 for the first donor_mort_hr_t_start years, ramping to
+	donor_mort_hr_late by donor_mort_hr_t_end) rather than a PSA-sampled or
+	OWSA-perturbed parameter, because the disagreement across studies reflects
+	non-proportional hazards (a time-varying effect), not sampling uncertainty
+	about one fixed number. This function instead compares that base-case
+	ramp against the flat HR implied by each individual literature estimate,
+	to characterize how much the result depends on which HR assumption holds.
+	"""
+	print("\nRunning donor mortality HR structural scenarios (analytic)...")
+
+	scenarios = {
+		"HR=0.60 flat (O'Keeffe 2018 pooled)": {
+			"donor_mort_hr_early": 0.60, "donor_mort_hr_late": 0.60},
+		"HR=1.00 flat (no excess mortality)": {
+			"donor_mort_hr_early": 1.00, "donor_mort_hr_late": 1.00},
+		"HR 1.00→1.30 by yr 10–15 (base case)": {
+			"donor_mort_hr_early": 1.00, "donor_mort_hr_late": 1.30,
+			"donor_mort_hr_t_start": 10.0, "donor_mort_hr_t_end": 15.0},
+		"HR=1.30 flat (Mjøen 2014 point estimate)": {
+			"donor_mort_hr_early": 1.30, "donor_mort_hr_late": 1.30},
+		"HR=1.52 flat (Mjøen 2014 upper 95% CI)": {
+			"donor_mort_hr_early": 1.52, "donor_mort_hr_late": 1.52},
+	}
+
+	results = {}
+	for label, overrides in scenarios.items():
+		p = BASE.copy()
+		p.update(overrides)
+		diff = run_arm_analytic(p, age_at_donation, donor=True) \
+			 - run_arm_analytic(p, age_at_donation, donor=False)
+		results[label] = diff
+		print(f"  {label:<40} ΔLE = {diff:+.3f} yr  ({diff*365.25:+.1f} days)")
 
 	return results
 
@@ -525,7 +584,7 @@ def _age_adjust_esrd_nondonor(base_rate: float, age: int, reference_age: int = 4
 	return base_rate * hr ** ((age - reference_age) / 10)
 
 
-# Grams 2016 direct sex×race non-donor baselines (Table 2, NEJM 374:411).
+# Grams 2016 direct sex×race non-donor baselines (abstract).
 # Option C sourcing rule: use this table wherever sex or race is stratified.
 # For race-unspecified ("Overall") sex analyses we use the White sex-specific
 # rates as a conservative approximation — White donors dominate the SRTR pool
@@ -700,7 +759,14 @@ def make_fig_psa(psa_diffs):
 
 
 # ── (C) TORNADO / OWSA ────────────────────────────────────────────────────────
-def make_fig_tornado(owsa_res):
+def make_fig_tornado(owsa_res, base_case=None):
+	"""
+	Tornado chart for the one-way sensitivity analysis. With the donor
+	all-cause mortality HR excluded (held fixed as a structural assumption;
+	see make_fig_hr_scenarios for that comparison), every scenario here is
+	within a few weeks of base case, so a single continuous axis suffices —
+	no split/broken axis is needed.
+	"""
 	labels   = list(owsa_res.keys())
 	vals     = [owsa_res[lbl] * 365.25 for lbl in labels]
 	colors_c = [_TEAL if v >= 0 else _CORAL for v in vals]
@@ -710,84 +776,46 @@ def make_fig_tornado(owsa_res):
 	colors_s   = [colors_c[i] for i in sorted_idx]
 	y_pos      = np.arange(len(labels_s))
 
-	abs_s         = np.abs(vals_s)
-	dominant_val  = vals_s[-1]
-	dominant_sign = int(np.sign(dominant_val))
-	break_abs     = abs_s[-2] * 1.35
-	break_val     = dominant_sign * break_abs
-
-	fig = plt.figure(figsize=(14, 5))
+	fig, ax = plt.subplots(figsize=(9, 5))
 	fig.patch.set_facecolor("#FFFFFF")
-	gs = gridspec.GridSpec(1, 2, figure=fig,
-						   width_ratios=[1, 3] if dominant_sign < 0 else [3, 1],
-						   wspace=0.03)
+	ax.barh(y_pos, vals_s, color=colors_s, alpha=0.8, height=0.65)
+	ax.set_yticks(y_pos)
+	ax.set_yticklabels(labels_s, fontsize=FS_TICK)
+	ax.set_facecolor(_LIGHT)
+	ax.spines[["top", "right"]].set_visible(False)
+	ax.spines[["left", "bottom"]].set_color("#B4B2A9")
+	ax.tick_params(colors="#5F5E5A", labelsize=FS_TICK)
 
-	if dominant_sign < 0:
-		ax_ext  = fig.add_subplot(gs[0])
-		ax_main = fig.add_subplot(gs[1])
-		ext_xlim  = (dominant_val * 1.08, break_val)
-		main_xlim = (break_val, 0)
-	else:
-		ax_main = fig.add_subplot(gs[0])
-		ax_ext  = fig.add_subplot(gs[1])
-		neg_vals = [v for v in vals_s if v < 0]
-		ext_xlim  = (break_val, dominant_val * 1.08)
-		main_xlim = (min(neg_vals) * 1.25 if neg_vals else -break_abs * 0.3, break_val)
+	if base_case is not None:
+		ax.axvline(base_case, color=_GRAY, lw=1.3, ls="--", zorder=4)
+		ax.margins(x=0.12)
 
-	for ax, xlim in ((ax_ext, ext_xlim), (ax_main, main_xlim)):
-		ax.barh(y_pos, vals_s, color=colors_s, alpha=0.8, height=0.65)
-		ax.set_xlim(*xlim)
-		ax.set_facecolor(_LIGHT)
-		ax.spines["top"].set_visible(False)
-		ax.spines["bottom"].set_color("#B4B2A9")
-		ax.tick_params(colors="#5F5E5A", labelsize=FS_TICK)
+	ax.set_xlabel("ΔLE (days): donor − non-donor", fontsize=FS_LABEL)
+	fig.tight_layout()
+	return fig
 
-	ax_main.set_yticks(y_pos)
-	ax_main.set_yticklabels(labels_s, fontsize=FS_TICK)
-	ax_main.yaxis.tick_right()
-	ax_ext.set_yticks([])
 
-	if dominant_sign < 0:
-		ax_ext.spines["right"].set_visible(False)
-		ax_ext.spines["left"].set_color("#B4B2A9")
-		ax_main.spines["left"].set_visible(False)
-		ax_main.spines["right"].set_color(_GRAY)
-	else:
-		ax_main.spines["right"].set_visible(False)
-		ax_main.spines["left"].set_color("#B4B2A9")
-		ax_ext.spines["left"].set_visible(False)
-		ax_ext.spines["right"].set_color("#B4B2A9")
+# ── (F) DONOR MORTALITY HR STRUCTURAL SCENARIOS ──────────────────────────────
+def make_fig_hr_scenarios(hr_res):
+	labels = list(hr_res.keys())
+	vals   = [hr_res[lbl] * 365.25 for lbl in labels]
+	colors = [_TEAL if v >= 0 else _CORAL for v in vals]
+	y_pos  = np.arange(len(labels))
 
-	d = 0.03
-	bkw = dict(color="#5F5E5A", clip_on=False, lw=1.5, zorder=5)
-	if dominant_sign < 0:
-		for y0 in (0, 1):
-			ax_ext.plot((1 - d, 1 + d), (y0 - d, y0 + d),
-						transform=ax_ext.transAxes, **bkw)
-			ax_main.plot((-d, +d), (y0 - d, y0 + d),
-						 transform=ax_main.transAxes, **bkw)
-	else:
-		for y0 in (0, 1):
-			ax_main.plot((1 - d, 1 + d), (y0 - d, y0 + d),
-						 transform=ax_main.transAxes, **bkw)
-			ax_ext.plot((-d, +d), (y0 - d, y0 + d),
-						transform=ax_ext.transAxes, **bkw)
-
-	ax_ext.text(
-		(break_val + dominant_val) / 2, len(labels_s) - 1,
-		f"{dominant_val:+.0f} d",
-		va="center", ha="center", fontsize=8.5, color="white", fontweight="bold"
-	)
-
-	base_case = -37
-	for ax, xlim in ((ax_ext, ext_xlim), (ax_main, main_xlim)):
-		if min(xlim) <= base_case <= max(xlim):
-			ax.axvline(base_case, color=_GRAY, lw=1.3, ls="--", zorder=4)
-
-	# ax_ext.set_xlabel("ΔLE (days)", fontsize=FS_LABEL)
-	ax_ext.set_facecolor("#FFFFFF")
-	ax_main.set_xlabel("ΔLE (days): donor − non-donor", fontsize=FS_LABEL)
-	# ax_main.set_title("One-way sensitivity analysis — tornado chart", fontsize=11, fontweight="bold", color="#2C2C2A", pad=7)
+	fig, ax = plt.subplots(figsize=(10, 4.5))
+	fig.patch.set_facecolor("#FFFFFF")
+	ax.barh(y_pos, vals, color=colors, alpha=0.85, height=0.6)
+	ax.axvline(0, color=_GRAY, lw=1.2, ls="--")
+	ax.set_yticks(y_pos)
+	ax.set_yticklabels(labels, fontsize=FS_TICK)
+	ax.set_xlabel("ΔLE (days): donor − non-donor", fontsize=FS_LABEL)
+	ax.margins(x=0.18)
+	for y, v in zip(y_pos, vals):
+		ax.text(v + (25 if v >= 0 else -25), y, f"{v:+.0f} d",
+				ha="left" if v >= 0 else "right", va="center",
+				fontsize=FS_CELL, fontweight="bold", color="#2C2C2A")
+	_style_ax(ax)
+	fig.tight_layout()
 	return fig
 
 
@@ -1226,6 +1254,12 @@ def make_age_race_sex_matrix():
 				mat[r, a] = (le_d - le_nd) * 365.25
 		matrices[sex] = mat
 
+	print("\nAge x race x sex matrix (dLE, days):")
+	for sex in sexes:
+		for r, race in enumerate(races):
+			row = "  ".join(f"{ages[a]}:{matrices[sex][r, a]:+.1f}" for a in range(len(ages)))
+			print(f"  {sex:<8} {race:<8} {row}")
+
 	abs_max = max(np.abs(m).max() for m in matrices.values())
 
 	fig, axes = plt.subplots(3, 1, figsize=(9, 11), constrained_layout=True)
@@ -1261,7 +1295,8 @@ def make_age_race_sex_matrix():
 
 
 # ── RESULTS TABLE ─────────────────────────────────────────────────────────────
-def make_results_table(base_res, psa_diffs, owsa_res, age_res, race_res, sex_res=None):
+def make_results_table(base_res, psa_diffs, owsa_res, age_res, race_res, sex_res=None,
+						hr_res=None):
 	rows = []
 
 	rows.append({
@@ -1310,7 +1345,17 @@ def make_results_table(base_res, psa_diffs, owsa_res, age_res, race_res, sex_res
 				"Note": "age 40"
 			})
 
-	for lbl in ["No priority (PLD=standard)", "Donor mort HR=1.30 (Mjøen)",
+	if hr_res:
+		for lbl, v in hr_res.items():
+			rows.append({
+				"Analysis": f"HR scenario: {lbl}",
+				"LE Donor (yr)": "—",
+				"LE Non-donor (yr)": "—",
+				"ΔLE (days)": f"{v*365.25:+.1f}",
+				"Note": "structural"
+			})
+
+	for lbl in ["No priority (PLD=standard)",
 				"ESRD RR ×11 (Mjøen upper)", "PLD wait 50 days (optimistic)",
 				"Post-Tx: LDKT quality"]:
 		rows.append({
@@ -1336,8 +1381,14 @@ PLOT_REGISTRY = {
 							 "make": lambda ctx: make_fig_psa(ctx["psa"]),
 							 "file": "kidney_model_B_psa.png"},
 	"tornado":             {"deps": ["owsa"],
-							 "make": lambda ctx: make_fig_tornado(ctx["owsa"]),
+							 "make": lambda ctx: make_fig_tornado(
+								 ctx["owsa"],
+								 base_case=(run_arm_analytic(BASE, 40, donor=True)
+											- run_arm_analytic(BASE, 40, donor=False)) * 365.25),
 							 "file": "kidney_model_C_tornado.png"},
+	"hr_scenarios":        {"deps": ["hr_scenarios"],
+							 "make": lambda ctx: make_fig_hr_scenarios(ctx["hr_scenarios"]),
+							 "file": "kidney_model_F_hr_scenarios.png"},
 	"age_subgroup":        {"deps": ["age"],
 							 "make": lambda ctx: make_fig_age_subgroup(ctx["age"]),
 							 "file": "kidney_model_D_age_subgroup.png"},
@@ -1362,22 +1413,24 @@ PLOT_REGISTRY = {
 	"sex":                 {"deps": ["sex"],
 							 "make": lambda ctx: make_sex_figure(ctx["sex"]),
 							 "file": "kidney_model_sex.png"},
-	"table":               {"deps": ["base", "psa", "owsa", "age", "race", "sex"],
+	"table":               {"deps": ["base", "psa", "owsa", "hr_scenarios", "age", "race", "sex"],
 							 "make": lambda ctx: make_results_table(
 								 ctx["base"], ctx["psa"], ctx["owsa"],
-								 ctx["age"], ctx["race"], ctx["sex"]),
+								 ctx["age"], ctx["race"], ctx["sex"],
+								 hr_res=ctx["hr_scenarios"]),
 							 "file": "kidney_model_results.csv"},
 }
 
 # How to compute each dependency, given prior context (all take no args except
 # "table"'s deps, which read straight from ctx already built by earlier steps).
 _COMPUTE_STEPS = {
-	"base":  lambda ctx: run_base_case(age_at_donation=40, n=N_SIM),
-	"psa":   lambda ctx: run_psa(age_at_donation=40, n_draws=N_DRAWS),
-	"owsa":  lambda ctx: run_owsa(age_at_donation=40),
-	"age":   lambda ctx: run_age_subgroups(),
-	"race":  lambda ctx: run_race_subgroups(age_at_donation=40),
-	"sex":   lambda ctx: run_sex_subgroups(age_at_donation=40),
+	"base":         lambda ctx: run_base_case(age_at_donation=40, n=N_SIM),
+	"psa":          lambda ctx: run_psa(age_at_donation=40, n_draws=N_DRAWS),
+	"owsa":         lambda ctx: run_owsa(age_at_donation=40),
+	"hr_scenarios": lambda ctx: run_hr_scenarios(age_at_donation=40),
+	"age":          lambda ctx: run_age_subgroups(),
+	"race":         lambda ctx: run_race_subgroups(age_at_donation=40),
+	"sex":          lambda ctx: run_sex_subgroups(age_at_donation=40),
 }
 
 
@@ -1412,7 +1465,7 @@ def main():
 
 	ctx = {}
 	# Fixed order so downstream logging always reads base → psa → owsa → age → race → sex
-	for step in ("base", "psa", "owsa", "age", "race", "sex"):
+	for step in ("base", "psa", "owsa", "hr_scenarios", "age", "race", "sex"):
 		if step in needed:
 			ctx[step] = _COMPUTE_STEPS[step](ctx)
 

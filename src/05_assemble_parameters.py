@@ -11,7 +11,8 @@ Key reconciliation decisions:
      — post-KAS250 (5/2021-4/2022): 58 months (1765 d) standard, 102.6 d PLD;
      pre-KAS250 (8/2018-7/2019) sensitivity: 61 months (1857 d) standard
   3. Donor all-cause mortality HR: base case 1.0 (Muzaale/US), sensitivity 1.30 (Mjøen)
-  4. ESRD Weibull shape k=1.5 (supported by Massie 2017 20-yr data)
+  4. ESRD Weibull shape k and PSA sigma fit via cloglog regression to Massie 2017's
+     5 published cumulative-incidence curves (median, IQR, 1st/99th pct)
   5. Race-specific waitlist/post-tx parameters from SRTR 2023 ADR
   6. wl_listing_prob=0.15 calibrated from USRDS 2025 ADR ESRD Ch.7 Figs 7.13/7.15/7.17
 
@@ -26,7 +27,7 @@ from pathlib import Path
 
 # Allow running from repo root or src/
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from utils import DATA_PROC, save_params, _hardcoded_base_params
+from utils import DATA_PROC, save_params, _hardcoded_base_params, massie_weibull_fit
 
 
 def load_json(path: Path) -> dict:
@@ -78,8 +79,11 @@ def main():
         gr.get("esrd_15yr_nodonate_white_sexavg_pct", 0.050) / 100
     )
 
-    # Weibull shape: k=1.5 supported by Massie 2017 20-yr data (RECONCILIATION DECISION 4)
-    params["weibull_shape"] = 1.5
+    # Weibull shape k and its PSA log-sigma: fit (not assumed) via cloglog
+    # regression to Massie 2017's five published cumulative-incidence curves
+    # (median, IQR, 1st/99th pct) — see massie_weibull_fit() in utils.py.
+    # (RECONCILIATION DECISION 4)
+    params["weibull_shape"], params["weibull_shape_log_sigma"] = massie_weibull_fit(mas)
 
     # Hazard ratios within donor cohort (Massie 2017)
     params["hr_black_race"]             = mas.get("hr_black_race", 2.96)
@@ -189,10 +193,20 @@ def main():
     params["ldkt_graft_5yr_age65p"]  = srtr.get("ldkt_graft_5yr_age65p",  0.808)
 
     # ── BACKGROUND MORTALITY ──────────────────────────────────────────────
-    # HR base case = 1.0 (Muzaale/Segev/Grams meta-analysis)
+    # Donor all-cause mortality HR, modeled as time-varying rather than a
+    # single fixed number: short/medium follow-up studies (Segev 2010, Garg
+    # 2012, Berger 2011, and the O'Keeffe 2018 pooled estimate that combines
+    # them) show no excess donor mortality, while Mjøen 2014 (median ~15 yr
+    # follow-up) found donor/control survival curves separate only after
+    # ~10 years, reaching HR=1.30 (95% CI 1.11-1.52) by ~25 years. These are
+    # not conflicting estimates of one static HR but evidence of a
+    # non-proportional (time-varying) hazard, so the disagreement is resolved
+    # structurally (donor_mort_hr_at() in utils.py) rather than by pooling.
     # (RECONCILIATION DECISION 3)
-    params["donor_mort_hr"]         = 1.0
-    params["donor_mort_hr_mjoeen"]  = mj.get("hr_all_cause_mortality", 1.30)
+    params["donor_mort_hr_early"]   = 1.0
+    params["donor_mort_hr_late"]    = mj.get("hr_all_cause_mortality", 1.30)
+    params["donor_mort_hr_t_start"] = 10.0
+    params["donor_mort_hr_t_end"]   = 15.0
 
     # ── METADATA ──────────────────────────────────────────────────────────
     params["_sources"] = {
@@ -200,15 +214,17 @@ def main():
         "esrd_nondonor_baseline": "Grams 2016 NEJM 374:411 (race-stratified); "
                                   "Muzaale 2014 (overall)",
         "esrd_hr_within_donors":  "Massie 2017 JASN 28:2749",
-        "weibull_shape":          "Calibrated to Massie 2017 20-yr cumulative incidence",
+        "weibull_shape":          "Fit via cloglog regression to Massie 2017's published "
+                                  "cumulative-incidence curves (median, IQR, 1st/99th pct)",
         "dialysis_survival":      "USRDS 2023/2024 ADR (hardcoded from published tables)",
         "waitlist_outcomes":      "SRTR 2023 ADR",
         "wl_listing_prob":        "USRDS 2025 ADR ESRD Vol. Ch.7 Figs 7.13/7.15/7.17",
         "pld_wait_time":          "Wainright 2017 AJT 17:1103; UNOS ATC abstract 2015",
         "posttx_survival":        "SRTR 2023 ADR DDKT patient survival (age-stratified)",
-        "donor_mort_hr_base":     "Muzaale 2014; Segev 2010 JAMA 303:959; "
-                                  "Grams 2018 meta-analysis (PubMed 29379948)",
-        "donor_mort_hr_sens":     "Mjøen 2014 Kidney Int 86:162",
+        "donor_mort_hr_early":    "Muzaale 2014; Segev 2010 JAMA 303:959; "
+                                  "O'Keeffe 2018 meta-analysis (PubMed 29379948)",
+        "donor_mort_hr_late":     "Mjøen 2014 Kidney Int 86:162 (HR=1.30, 95% CI "
+                                  "1.11-1.52; survival curves separate after ~10 yr)",
         "life_tables":            "CDC NVSR Vol 72 No 12 (Nov 2023) — 2021 US life tables",
     }
     params["_reconciliation_notes"] = [
@@ -217,7 +233,9 @@ def main():
         "1765d standard post-KAS250 (100d PLD, Wainright 2017); 1857d pre-KAS250 sensitivity",
         "Donor all-cause mortality HR=1.0 base case per US evidence; "
         "1.30 as sensitivity (Mjøen)",
-        "Weibull k=1.5 supported by Massie 2017 20-yr data showing accelerating hazard",
+        "Weibull shape k and PSA sigma fit via cloglog regression to Massie 2017's 5 "
+        "published cumulative-incidence curves (median, IQR, 1st/99th pct), not assumed "
+        "(see massie_weibull_fit in utils.py)",
         "Post-tx mortality age-stratified from SRTR 2023 DDKT 5-yr patient survival",
         "wl_listing_prob=0.15: back-calculated from USRDS 2025 Fig 7.15 3-yr CIF=12% "
         "(general ESRD p≈0.065/yr), scaled for donor-like 18-44 cohort via Figs 7.13+7.17 "
@@ -234,7 +252,8 @@ def main():
     print(f"  RR:                           {params['esrd_15yr_donor_overall']/params['esrd_15yr_nondonor']:.1f}×")
     print(f"  Nondonor ESRD 15yr (black):   {params['esrd_15yr_nondonor_black']:.4%}")
     print(f"  Nondonor ESRD 15yr (white):   {params['esrd_15yr_nondonor_white']:.4%}")
-    print(f"  Weibull shape:                {params['weibull_shape']}")
+    print(f"  Weibull shape (fit):          {params['weibull_shape']:.4f}")
+    print(f"  Weibull shape log-sigma (fit):{params['weibull_shape_log_sigma']:.4f}")
     print(f"  Dialysis 1yr mortality:       {params['dialysis_1yr_mort']:.0%}")
     print(f"  Waitlist mort (overall):      {params['wl_mort_per_100py']:.1f}/100 PY")
     print(f"  Std wait (mean days):         {params['wl_std_mean_days']}")
@@ -245,8 +264,8 @@ def main():
     print(f"    age 35-49:                  {params['posttx_annual_mort_age3549']:.1%}")
     print(f"    age 50-64:                  {params['posttx_annual_mort_age5064']:.1%}")
     print(f"    age 65+:                    {params['posttx_annual_mort_age65p']:.1%}")
-    print(f"  Donor mort HR (base):         {params['donor_mort_hr']:.2f}")
-    print(f"  Donor mort HR (Mjøen):        {params['donor_mort_hr_mjoeen']:.2f}")
+    print(f"  Donor mort HR (early, <={params['donor_mort_hr_t_start']:.0f}yr): {params['donor_mort_hr_early']:.2f}")
+    print(f"  Donor mort HR (late, >={params['donor_mort_hr_t_end']:.0f}yr):  {params['donor_mort_hr_late']:.2f}")
     print("\nDone.")
 
 

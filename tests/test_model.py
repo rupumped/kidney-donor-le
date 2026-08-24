@@ -181,18 +181,24 @@ class TestSimulation:
         le = ly.mean()
         assert 28 < le < 42, f"LE from age 40 should be ~33 yr, got {le:.1f}"
 
-    def test_donor_le_close_to_nondonor(self):
-        """With common RNG, donor and non-donor LE should be within 1 year."""
+    def test_donor_le_lower_than_nondonor(self):
+        """Under the base-case time-varying donor mortality HR (flat at 1.0
+        through year 10, ramping to 1.30 by year 15, held thereafter), donor
+        LE should be lower than non-donor LE by roughly 2-3 years -- this is
+        now the dominant, intentional effect in the model (see design.tex),
+        not a small ESRD-driven perturbation, so a tight "should be close"
+        tolerance no longer applies."""
         p = BASE.copy()
         le_nd = SIM.simulate_cohort(p, 20_000, 40, False, rng=np.random.default_rng(1)).mean()
         le_d  = SIM.simulate_cohort(p, 20_000, 40, True,  rng=np.random.default_rng(1)).mean()
-        assert abs(le_d - le_nd) < 1.0, \
-            f"Donor/non-donor LE should be within 1 yr, diff={abs(le_d-le_nd):.2f}"
+        diff = le_nd - le_d
+        assert 1.5 < diff < 4.0, \
+            f"Donor LE should be ~2-3 yr lower than non-donor under base-case HR, diff={diff:.2f}"
 
     def test_esrd_cost_negative(self):
         """Donation without priority should reduce LE vs non-donation."""
         p = BASE.copy()
-        p["wl_pld_median_days"] = p["wl_std_median_days"]  # strip priority
+        p["wl_pld_mean_days"] = p["wl_std_mean_days"]  # strip priority
         le_nd = SIM.simulate_cohort(p, 50_000, 40, False, rng=np.random.default_rng(2)).mean()
         le_d  = SIM.simulate_cohort(p, 50_000, 40, True,  rng=np.random.default_rng(2)).mean()
         assert le_d < le_nd, "Donation without priority should reduce LE"
@@ -201,7 +207,7 @@ class TestSimulation:
         """Priority wait should give higher LE than standard wait for ESRD patients."""
         p_pri = BASE.copy()
         p_std = BASE.copy()
-        p_std["wl_pld_median_days"] = BASE["wl_std_median_days"]
+        p_std["wl_pld_mean_days"] = BASE["wl_std_mean_days"]
         # Start cohort in ESRD state directly
         def sim_from_esrd(params, priority, seed):
             state = np.ones(20_000, dtype=np.int8)

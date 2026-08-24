@@ -531,7 +531,7 @@ def main(age_at_entry: int = 40, n: int = N_PER_ARM):
     print(f"    with no countervailing elevated ESRD risk (unlike donors).")
     print()
     print("  Comparison to prior living donor analysis (07_cohort_markov.py):")
-    print("    Donor ΔLE ≈ −38 days  (net harm: elevated ESRD risk dominates)")
+    print("    Donor ΔLE ≈ −912 days (net harm: time-varying donor mortality HR dominates)")
     print(f"    Voucher ΔLE ≈ +{base_diff_days:.1f} days (net benefit: priority with no added risk)")
     print()
     print("  Largest sensitivity drivers (see tornado plot):")

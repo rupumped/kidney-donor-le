@@ -481,7 +481,7 @@ def main(age_at_esrd: int = 60, n: int = N_PER_ARM):
           f"  (ESRD onset age {age_at_esrd})")
     print()
     print("  Comparison across scripts:")
-    print("    07 donor vs non-donor (pop. level):    ΔLE ≈ −38 days")
+    print("    07 donor vs non-donor (pop. level):    ΔLE ≈ −912 days")
     print(f"    09 voucher vs control (pop. level):    ΔLE ≈ +0.3 days")
     print(f"    10 priority vs standard | ESRD:        ΔLE ≈ {base_diff_days:+.1f} days  ←")
     print()
