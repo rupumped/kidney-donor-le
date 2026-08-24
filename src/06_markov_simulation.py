@@ -975,17 +975,15 @@ def make_age_race_matrix():
 	fig.patch.set_facecolor("#FAFAF8")
 	ax.set_facecolor("#FAFAF8")
 
-	abs_max = np.abs(matrix).max()
-	im = ax.imshow(matrix, cmap="RdYlGn", vmin=-abs_max, vmax=abs_max,
+	im = ax.imshow(matrix, cmap="YlOrRd_r", vmin=matrix.min(), vmax=matrix.max(),
 				   aspect="auto")
 
 	# Cell labels
 	for r in range(len(races)):
 		for a in range(len(ages)):
 			val = matrix[r, a]
-			color = "black" if abs(val) < 0.6 * abs_max else "white"
 			ax.text(a, r, f"{val:+.0f} d", ha="center", va="center",
-					fontsize=FS_CELL, fontweight="bold", color=color)
+					fontsize=FS_CELL, fontweight="bold", color="black")
 
 	ax.set_xticks(range(len(ages)))
 	ax.set_xticklabels([f"Age {a}" for a in ages], fontsize=12)
@@ -1059,15 +1057,13 @@ def make_age_sex_matrix():
 	fig.patch.set_facecolor("#FAFAF8")
 	ax.set_facecolor("#FAFAF8")
 
-	abs_max = np.abs(matrix).max()
-	im = ax.imshow(matrix, cmap="RdYlGn", vmin=-abs_max, vmax=abs_max, aspect="auto")
+	im = ax.imshow(matrix, cmap="YlOrRd_r", vmin=matrix.min(), vmax=matrix.max(), aspect="auto")
 
 	for s in range(len(sexes)):
 		for a in range(len(ages)):
 			val = matrix[s, a]
-			color = "black" if abs(val) < 0.6 * abs_max else "white"
 			ax.text(a, s, f"{val:+.0f} d", ha="center", va="center",
-					fontsize=11, fontweight="bold", color=color)
+					fontsize=11, fontweight="bold", color="black")
 
 	ax.set_xticks(range(len(ages)))
 	ax.set_xticklabels([f"Age {a}" for a in ages], fontsize=10)
@@ -1157,15 +1153,13 @@ def make_sex_race_matrix():
 	fig.patch.set_facecolor("#FAFAF8")
 	ax.set_facecolor("#FAFAF8")
 
-	abs_max = np.abs(matrix).max()
-	im = ax.imshow(matrix, cmap="RdYlGn", vmin=-abs_max, vmax=abs_max, aspect="auto")
+	im = ax.imshow(matrix, cmap="YlOrRd_r", vmin=matrix.min(), vmax=matrix.max(), aspect="auto")
 
 	for r in range(len(races)):
 		for s in range(len(sexes)):
 			val = matrix[r, s]
-			color = "black" if abs(val) < 0.6 * abs_max else "white"
 			ax.text(s, r, f"{val:+.0f} d", ha="center", va="center",
-					fontsize=11, fontweight="bold", color=color)
+					fontsize=11, fontweight="bold", color="black")
 
 	ax.set_xticks(range(len(sexes)))
 	ax.set_xticklabels(sexes, fontsize=11, fontweight="bold")
@@ -1260,7 +1254,8 @@ def make_age_race_sex_matrix():
 			row = "  ".join(f"{ages[a]}:{matrices[sex][r, a]:+.1f}" for a in range(len(ages)))
 			print(f"  {sex:<8} {race:<8} {row}")
 
-	abs_max = max(np.abs(m).max() for m in matrices.values())
+	mat_min = min(m.min() for m in matrices.values())
+	mat_max = max(m.max() for m in matrices.values())
 
 	fig, axes = plt.subplots(3, 1, figsize=(9, 11), constrained_layout=True)
 	fig.patch.set_facecolor("white")
@@ -1269,13 +1264,12 @@ def make_age_race_sex_matrix():
 	for i, (ax, sex) in enumerate(zip(axes, sexes)):
 		mat = matrices[sex]
 		ax.set_facecolor("white")
-		im = ax.imshow(mat, cmap="RdYlGn", vmin=-abs_max, vmax=abs_max, aspect="auto")
+		im = ax.imshow(mat, cmap="YlOrRd_r", vmin=mat_min, vmax=mat_max, aspect="auto")
 
 		for r in range(len(races)):
 			for a in range(len(ages)):
 				val = mat[r, a]
-				color = "black" if abs(val) < 0.6 * abs_max else "white"
-				ax.text(a, r, f"{val:+.0f} d", ha="center", va="center",fontsize=FS_CELL, fontweight="bold", color=color)
+				ax.text(a, r, f"{val:+.0f} d", ha="center", va="center",fontsize=FS_CELL, fontweight="bold", color="black")
 
 		ax.set_xticks(range(len(ages)))
 		is_last = i == len(sexes) - 1
