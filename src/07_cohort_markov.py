@@ -281,14 +281,14 @@ def main(age_at_entry: int = 40, n: int = N_PER_ARM):
           f"alive={last['alive']:.1f}")
 
     fig_occ = make_fig_state_occupancy(trace_d, trace_nd, n)
-    occ_path = RESULTS / "cohort_markov_state_occupancy.png"
+    occ_path = RESULTS / "cohort_markov_state_occupancy.pdf"
     fig_occ.savefig(occ_path, dpi=150, bbox_inches="tight",
                     facecolor=fig_occ.get_facecolor())
     plt.close()
     print(f"\nFigure saved: {occ_path}")
 
     fig_surv = make_fig_survival(trace_d, trace_nd, n, age_at_entry)
-    surv_path = RESULTS / "cohort_markov_survival.png"
+    surv_path = RESULTS / "cohort_markov_survival.pdf"
     fig_surv.savefig(surv_path, dpi=150, bbox_inches="tight",
                      facecolor=fig_surv.get_facecolor())
     plt.close()

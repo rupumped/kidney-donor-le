@@ -1,7 +1,9 @@
-\section*{Tables}
+\clearpage
+\onecolumn
+\section{Tables}
 \label{sec:tables}
 
-\begin{table*}[ht]
+\begin{table}[!ht]
 	\centering
 	\caption{\textbf{One-way sensitivity analysis:} parameter values tested and the resulting change in life expectancy (donor arm minus non-donor arm), age~40 at donation, all other parameters held at base-case values, including the donor all-cause mortality HR, which is held at its base-case time-varying profile rather than perturbed here (see Table~\ref{tab:hr-structural} and Figure~\ref{fig:hr_scenarios} for sensitivity to that assumption). Negative $\Delta\text{LE}$ values indicate a net life-expectancy cost of donation relative to the matched non-donor arm under the value tested; positive values indicate a donor-arm benefit. The ``$8\times$ controls (base case)'' row reproduces the overall base-case result reported in the main results ($\Delta\text{LE}~=-909.3$~d).}
 	\label{tab:owsa}
@@ -32,21 +34,24 @@
 	\quad LDKT quality (SRTR Figure~KI~76) & $-889.8$ & $+19.5$ \\
 	\bottomrule
 	\end{tabular}
-\end{table*}
+\end{table}
 
-\begin{table*}[ht]
+\begin{table}[!ht]
 	\centering
-	\caption{\textbf{Structural sensitivity: donor mortality hazard ratio.} $\Delta\text{LE}$ under the base-case time-varying HR profile versus a flat HR taken from each individual published estimate and applied for the donor's entire remaining lifetime, age~40 at donation. Unlike Table~\ref{tab:owsa}, this range reflects a genuine disagreement about model structure (whether, and when, donor mortality risk rises) rather than sampling uncertainty.}
+	\caption{\textbf{Structural sensitivity: donor mortality hazard ratio.} $\Delta\text{LE}$ under the base-case time-varying HR profile versus a flat HR taken from each individual published estimate and applied for the donor's entire remaining lifetime, age~40 at donation. Unlike Table~\ref{tab:owsa}, this range reflects a genuine question about model structure (whether, and when, donor mortality risk rises) rather than sampling uncertainty.}
 	\label{tab:hr-structural}
 	\begin{tabular}{lr}
 	\toprule
 	HR assumption & $\Delta\text{LE}$ (days) \\
 	\midrule
-	HR~$=0.60$ flat (O'Keeffe et~al.\ 2018 pooled estimate) & $+1{,}855.8$ \\
+	% HR~$=0.60$ flat (O'Keeffe et~al.\ 2018 pooled estimate) & $+1{,}855.8$ \\
 	HR~$=1.00$ flat (no excess mortality) & $-68.3$ \\
 	HR $1.00\rightarrow 1.30$, years 10--15 (base case) & $-909.3$ \\
 	HR~$=1.30$ flat (Mjøen et~al.\ 2014 point estimate) & $-1{,}084.5$ \\
 	HR~$=1.52$ flat (Mjøen et~al.\ 2014 upper 95\%~CI) & $-1{,}694.0$ \\
 	\bottomrule
 	\end{tabular}
-\end{table*}
+\end{table}
+
+\clearpage
+\twocolumn

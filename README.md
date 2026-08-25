@@ -1,18 +1,7 @@
 #  Post-Transplant Survival, Not Waitlist Time, Drives the Life-Expectancy Cost of Living Kidney Donation
+Quantitative model assessing the life-expectancy cost of kidney donation
 
-Quantitative model assessing whether living donor priority policies offset the
-increased ESRD risk associated with kidney donation
-
-## Research question
-
-Does the US kidney allocation priority afforded to prior living donors
-(~100-day median wait vs ~985 days for standard candidates) offset the
-elevated ESRD risk from donation (~3.7–4.5× matched controls), making
-donation life-expectancy neutral or net positive?
-
-**Short answer from the model:** No. Priority offsets only a fraction of the ESRD cost.
-The dominant cost is the permanent post-transplant survival gap, which no allocation
-policy can address.
+**Short answer from the model:** Kidney donation costs the average donor about two and a half years of life expectancy. This varies based on race, sex, and age at time of donation and depends heavily on an unresolved question in the literature: whether donor all-cause mortality risk rises only after roughly a decade post-donation, or not at all.
 
 ## Repository structure
 
@@ -38,7 +27,9 @@ kidney-donor-le/
 │       ├── usrds_ckd_risk_behaviors.csv
 │       ├── usrds_esrd7_params.json
 │       └── usrds_params.json
-├── paper/                           # LaTeX files
+├── paper/                           # LaTeX manuscript, sections/, figures/, references.bib
+├── scripts/
+│   └── svg_to_pdf.sh                # Renders paper/results SVG figures to PDF (needs rsvg-convert)
 ├── src/
 │   ├── 01_download_lifetables.py    # CDC NVSR 2021 US life tables
 │   ├── 02_download_usrds.py         # USRDS ADR 2025 CKD Chapter 1 (general CKD)
@@ -50,7 +41,7 @@ kidney-donor-le/
 │   │                                #            srtr_patient_survival.csv
 │   ├── 04_literature_params.py      # Parameters from Muzaale 2014, Grams 2016, etc.
 │   ├── 05_assemble_parameters.py    # Combines all sources into params.json
-│   ├── 06_markov_simulation.py      # Main Monte Carlo simulation (PSA + OWSA)
+│   ├── 06_markov_simulation.py      # Main Monte Carlo simulation (PSA + OWSA + subgroups)
 │   ├── 07_cohort_markov.py          # Analytic (deterministic) cohort Markov model
 │   ├── 08_calibration.py            # Face-validity checks vs SRTR KI 22 / KI 70
 │   ├── 09_voucher_cohort_markov.py  # Voucher-holder cohort: LE benefit of priority
@@ -59,33 +50,33 @@ kidney-donor-le/
 │   │                                          #   of priority vs standard waitlist,
 │   │                                          #   conditioned on ESRD onset
 │   └── utils.py                     # Shared helpers
-├── results/                         # Output figures and tables
+├── results/                         # Output figures (PDF) and tables
 │   ├── kidney_model_results.csv          # Summary table of all analyses
 │   ├── calibration_report.txt            # Face-validity calibration summary
-│   ├── kidney_model_A_distributions.png  # Input parameter distributions
-│   ├── kidney_model_B_psa.png            # Probabilistic sensitivity analysis
-│   ├── kidney_model_C_tornado.png        # One-way sensitivity (tornado) diagram
-│   ├── kidney_model_D_age_subgroup.png   # ΔLE by age at donation
-│   ├── kidney_model_E_race_subgroup.png  # ΔLE by race
-│   ├── kidney_model_age_race_matrix.png  # ΔLE heat map: age × race
-│   ├── kidney_model_age_race_sex_matrix.png
-│   ├── kidney_model_age_sex_matrix.png   # ΔLE heat map: age × sex
-│   ├── kidney_model_sex_race_matrix.png  # ΔLE heat map: sex × race
-│   ├── kidney_model_race.png             # Race subgroup summary
-│   ├── kidney_model_sex.png              # Sex subgroup summary
-│   ├── cohort_markov_state_occupancy.png      # State occupancy over time (cohort Markov)
-│   ├── cohort_markov_survival.png             # Survival curves (cohort Markov)
-│   ├── voucher_cohort_state_occupancy.png     # State occupancy — voucher vs control
-│   ├── voucher_cohort_survival.png            # Survival curves — voucher vs control
-│   ├── voucher_cohort_owsa_tornado.png        # OWSA tornado — voucher LE benefit
-│   ├── voucher_cohort_age_sweep.png           # Voucher LE benefit by age at designation
-│   ├── esrd_conditional_state_occupancy.png   # State occupancy — priority vs standard | ESRD
-│   ├── esrd_conditional_survival.png          # Survival from ESRD onset
-│   ├── esrd_conditional_owsa_tornado.png      # OWSA tornado — priority waitlist LE benefit | ESRD
-│   └── esrd_conditional_age_sweep.png         # Priority waitlist benefit by age at ESRD onset
+│   ├── kidney_model_A_distributions.pdf  # Input parameter distributions
+│   ├── kidney_model_D_age_subgroup.pdf   # ΔLE by age at donation
+│   ├── kidney_model_E_race_subgroup.pdf  # ΔLE by race
+│   ├── kidney_model_F_hr_scenarios.pdf   # ΔLE under alternative donor mortality HR scenarios
+│   ├── kidney_model_age_race_matrix.pdf  # ΔLE heat map: age × race
+│   ├── kidney_model_age_race_sex_matrix.pdf  # ΔLE: age × race, faceted by sex
+│   ├── kidney_model_age_sex_matrix.pdf   # ΔLE heat map: age × sex
+│   ├── kidney_model_sex_race_matrix.pdf  # ΔLE heat map: sex × race
+│   ├── kidney_model_race.pdf             # Race subgroup summary
+│   ├── kidney_model_sex.pdf              # Sex subgroup summary
+│   ├── cohort_markov_state_occupancy.pdf      # State occupancy over time (cohort Markov)
+│   ├── cohort_markov_survival.pdf             # Survival curves (cohort Markov)
+│   ├── voucher_cohort_state_occupancy.pdf     # State occupancy — voucher vs control
+│   ├── voucher_cohort_survival.pdf            # Survival curves — voucher vs control
+│   ├── voucher_cohort_owsa_tornado.pdf        # OWSA tornado — voucher LE benefit
+│   ├── voucher_cohort_age_sweep.pdf           # Voucher LE benefit by age at designation
+│   ├── esrd_conditional_state_occupancy.pdf   # State occupancy — priority vs standard | ESRD
+│   ├── esrd_conditional_survival.pdf          # Survival from ESRD onset
+│   └── esrd_conditional_owsa_tornado.pdf      # OWSA tornado — priority waitlist LE benefit | ESRD
 └── tests/
     └── test_model.py               # Validation checks
 ```
+
+Note: `kidney_model_B_psa.pdf` (probabilistic sensitivity analysis) and `kidney_model_C_tornado.pdf` (one-way sensitivity tornado) are generated by `src/06_markov_simulation.py` but currently live only under `paper/figures/`, not `results/` — regenerate them with `--plots psa tornado` if you need them in `results/` too.
 
 ## Data sources
 
@@ -123,42 +114,14 @@ python src/04_literature_params.py
 python src/05_assemble_parameters.py
 
 # Step 2: Run simulation
-python src/06_markov_simulation.py      # Monte Carlo (PSA + OWSA + subgroups)
+python src/06_markov_simulation.py      # Monte Carlo: all outputs (PSA + OWSA + HR scenarios + subgroups)
 python src/07_cohort_markov.py          # Analytic cohort Markov (optional, --age N)
 python src/08_calibration.py            # Face-validity checks vs SRTR KI 22 / KI 70
 python src/09_voucher_cohort_markov.py  # Voucher-holder LE benefit (optional, --age N)
 python src/10_esrd_conditional_cohort_markov.py  # Priority benefit | ESRD (optional, --age N)
-
-# Results appear in results/
 ```
+Results (figures as PDF, tables as CSV) appear in `results/`
 
-## Key findings
-
-See [results/kidney_model_results.csv](results/kidney_model_results.csv) for current figures (re-run the simulation
-after any parameter changes). Base-case results:
-
-| Analysis | LE Donor (yr) | LE Non-donor (yr) | ΔLE (days) |
-|----------|--------------|-------------------|------------|
-| Base case (age 40, overall) | 35.63 | 38.14 | −914.3 |
-| Age 25 | 48.65 | 51.75 | −1131.6 |
-| Age 35 | 39.90 | 42.62 | −991.5 |
-| Age 45 | 31.51 | 33.74 | −814.0 |
-| Age 55 | 23.69 | 25.31 | −591.2 |
-| Race: White | 35.68 | 38.13 | −892.5 |
-| Race: Black | 35.39 | 38.01 | −950.7 |
-| Sex: Female | 38.08 | 40.46 | −888.3 |
-| Sex: Male | 33.55 | 36.07 | −915.9 |
-| Sensitivity: Donor mort HR=1.30 flat (Mjøen) | — | — | −1084.5 |
-| Sensitivity: Post-Tx LDKT quality | — | — | −889.8 |
-
-Key takeaways:
-- **Priority offsets** only ~0.2 days of the ESRD risk cost (base case −909.3 vs no-priority −909.5 days)
-- **Dominant cost:** Time-varying donor all-cause mortality HR (flat at 1.0 through year 10, ramping to Mjøen's 1.30 by year 15) — unaffected by allocation policy
-- **Age pattern:** Net harm is greatest for young donors and falls substantially by age 55, since a younger donor spends more of their remaining life under the elevated HR
-- **Race:** Black donors bear somewhat more cost than white donors (−951 vs −893 days at age 40), though this ESRD-driven gap is now a minor contributor next to the mortality-HR effect
-- **Critical uncertainty:** The donor mortality HR assumption dominates every other source of uncertainty — holding it flat at the literature's individual point estimates ranges from a multi-year *benefit* (HR=0.60, O'Keeffe pooled estimate) to a cost exceeding 4.6 years (HR=1.52, Mjøen upper 95% CI)
-- **LDKT vs DDKT:** If post-Tx survival at LDKT quality, harm falls to −889.8 days (vs −909.3 base)
-- **PSA:** P(donation beneficial) = 0%; mean ΔLE −910.8 days [−936.1, −889.3], reflecting narrow residual uncertainty once the mortality HR is held fixed at its base-case time-varying profile
 
 ## Testing
 
@@ -167,12 +130,3 @@ python3 -m pytest tests/ -v
 ```
 
 Tests require `data/processed/` to be populated (run scripts 01–05 first).
-
-## Citation
-This model cites the primary data sources:
-- Muzaale AD et al. JAMA 2014;311:579–586
-- Grams ME et al. NEJM 2016;374:411–421
-- Massie AB et al. JASN 2017;28:2749–2755
-- SRTR 2023 Annual Data Report
-- USRDS 2025 Annual Data Report (ESRD Volume, Chapters 1 & 7)
-- CDC National Vital Statistics Reports Vol 72 No 12 (2023)

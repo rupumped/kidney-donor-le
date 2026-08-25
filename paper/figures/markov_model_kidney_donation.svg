@@ -113,8 +113,8 @@
 
 <!-- (13) Post-transplant → Death (dashed stub down) -->
 <path d="M340 526 L340 550" fill="none" stroke="rgb(120,118,110)" stroke-width="0.8" stroke-dasharray="4 3" marker-end="url(#arrow)" opacity="0.55"/>
-<text x="347" y="533" dominant-baseline="central" style="fill:black;font-size:10px;">3.5%/yr (age-stratified)</text>
-<text x="347" y="544" dominant-baseline="central" style="fill:black;font-size:9px;">SRTR 2023 DDKT patient survival</text>
+<text x="347" y="538" dominant-baseline="central" style="fill:black;font-size:10px;">3.5%/yr (age-stratified)</text>
+<text x="347" y="549" dominant-baseline="central" style="fill:black;font-size:9px;">SRTR 2023 DDKT patient survival</text>
 
 <!-- (14) Post-transplant → Dialysis (graft failure — returns to Dialysis, not ESRD) -->
 <path d="M320 470 L320 284" fill="none" stroke="rgb(120,118,110)" stroke-width="0.8" marker-end="url(#arrow)" opacity="0.7"/>

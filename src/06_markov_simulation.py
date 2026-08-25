@@ -26,17 +26,17 @@ Usage:
 
 Outputs in results/:
   kidney_model_results.csv              — summary table
-  kidney_model_A_distributions.png      — input parameter distributions
-  kidney_model_B_psa.png                — probabilistic sensitivity analysis
-  kidney_model_C_tornado.png            — one-way sensitivity (tornado) diagram
-  kidney_model_D_age_subgroup.png       — ΔLE by age at donation
-  kidney_model_E_race_subgroup.png      — ΔLE by race
-  kidney_model_race.png                 — race-stratified LE distributions
-  kidney_model_sex.png                  — sex-stratified LE distributions
-  kidney_model_age_race_matrix.png      — age × race ΔLE heatmap
-  kidney_model_age_sex_matrix.png       — age × sex ΔLE heatmap
-  kidney_model_sex_race_matrix.png      — sex × race ΔLE heatmap
-  kidney_model_age_race_sex_matrix.png  — age × race faceted by sex (all three variables)
+  kidney_model_A_distributions.pdf      — input parameter distributions
+  kidney_model_B_psa.pdf                — probabilistic sensitivity analysis
+  kidney_model_C_tornado.pdf            — one-way sensitivity (tornado) diagram
+  kidney_model_D_age_subgroup.pdf       — ΔLE by age at donation
+  kidney_model_E_race_subgroup.pdf      — ΔLE by race
+  kidney_model_race.pdf                 — race-stratified LE distributions
+  kidney_model_sex.pdf                  — sex-stratified LE distributions
+  kidney_model_age_race_matrix.pdf      — age × race ΔLE heatmap
+  kidney_model_age_sex_matrix.pdf       — age × sex ΔLE heatmap
+  kidney_model_sex_race_matrix.pdf      — sex × race ΔLE heatmap
+  kidney_model_age_race_sex_matrix.pdf  — age × race faceted by sex (all three variables)
 """
 
 import argparse
@@ -511,8 +511,8 @@ def run_hr_scenarios(age_at_donation=40):
 	print("\nRunning donor mortality HR structural scenarios (analytic)...")
 
 	scenarios = {
-		"HR=0.60 flat (O'Keeffe 2018 pooled)": {
-			"donor_mort_hr_early": 0.60, "donor_mort_hr_late": 0.60},
+		# "HR=0.60 flat (O'Keeffe 2018 pooled)": {
+			# "donor_mort_hr_early": 0.60, "donor_mort_hr_late": 0.60},
 		"HR=1.00 flat (no excess mortality)": {
 			"donor_mort_hr_early": 1.00, "donor_mort_hr_late": 1.00},
 		"HR 1.00→1.30 by yr 10–15 (base case)": {
@@ -798,6 +798,7 @@ def make_fig_tornado(owsa_res, base_case=None):
 # ── (F) DONOR MORTALITY HR STRUCTURAL SCENARIOS ──────────────────────────────
 def make_fig_hr_scenarios(hr_res):
 	labels = list(hr_res.keys())
+	labels_2l = [lbl.replace(" (", "\n").rstrip(")") for lbl in labels]
 	vals   = [hr_res[lbl] * 365.25 for lbl in labels]
 	colors = [_TEAL if v >= 0 else _CORAL for v in vals]
 	y_pos  = np.arange(len(labels))
@@ -807,14 +808,15 @@ def make_fig_hr_scenarios(hr_res):
 	ax.barh(y_pos, vals, color=colors, alpha=0.85, height=0.6)
 	ax.axvline(0, color=_GRAY, lw=1.2, ls="--")
 	ax.set_yticks(y_pos)
-	ax.set_yticklabels(labels, fontsize=FS_TICK)
-	ax.set_xlabel("ΔLE (days): donor − non-donor", fontsize=FS_LABEL)
+	_style_ax(ax)
+	ax.set_yticklabels(labels_2l, fontsize=FS_TICK+1)
+	ax.tick_params(axis="x", labelsize=FS_TICK+1)
+	ax.set_xlabel("ΔLE (days): donor − non-donor", fontsize=FS_LABEL+6)
 	ax.margins(x=0.18)
 	for y, v in zip(y_pos, vals):
 		ax.text(v + (25 if v >= 0 else -25), y, f"{v:+.0f} d",
 				ha="left" if v >= 0 else "right", va="center",
 				fontsize=FS_CELL, fontweight="bold", color="#2C2C2A")
-	_style_ax(ax)
 	fig.tight_layout()
 	return fig
 
@@ -1370,43 +1372,43 @@ def make_results_table(base_res, psa_diffs, owsa_res, age_res, race_res, sex_res
 PLOT_REGISTRY = {
 	"distributions":       {"deps": ["base"],
 							 "make": lambda ctx: make_fig_distributions(ctx["base"]),
-							 "file": "kidney_model_A_distributions.png"},
+							 "file": "kidney_model_A_distributions.pdf"},
 	"psa":                 {"deps": ["psa"],
 							 "make": lambda ctx: make_fig_psa(ctx["psa"]),
-							 "file": "kidney_model_B_psa.png"},
+							 "file": "kidney_model_B_psa.pdf"},
 	"tornado":             {"deps": ["owsa"],
 							 "make": lambda ctx: make_fig_tornado(
 								 ctx["owsa"],
 								 base_case=(run_arm_analytic(BASE, 40, donor=True)
 											- run_arm_analytic(BASE, 40, donor=False)) * 365.25),
-							 "file": "kidney_model_C_tornado.png"},
+							 "file": "kidney_model_C_tornado.pdf"},
 	"hr_scenarios":        {"deps": ["hr_scenarios"],
 							 "make": lambda ctx: make_fig_hr_scenarios(ctx["hr_scenarios"]),
-							 "file": "kidney_model_F_hr_scenarios.png"},
+							 "file": "kidney_model_F_hr_scenarios.pdf"},
 	"age_subgroup":        {"deps": ["age"],
 							 "make": lambda ctx: make_fig_age_subgroup(ctx["age"]),
-							 "file": "kidney_model_D_age_subgroup.png"},
+							 "file": "kidney_model_D_age_subgroup.pdf"},
 	"race_subgroup":       {"deps": ["race"],
 							 "make": lambda ctx: make_fig_race_subgroup(ctx["race"]),
-							 "file": "kidney_model_E_race_subgroup.png"},
+							 "file": "kidney_model_E_race_subgroup.pdf"},
 	"age_race_matrix":     {"deps": [],
 							 "make": lambda ctx: make_age_race_matrix(),
-							 "file": "kidney_model_age_race_matrix.png"},
+							 "file": "kidney_model_age_race_matrix.pdf"},
 	"age_sex_matrix":      {"deps": [],
 							 "make": lambda ctx: make_age_sex_matrix(),
-							 "file": "kidney_model_age_sex_matrix.png"},
+							 "file": "kidney_model_age_sex_matrix.pdf"},
 	"sex_race_matrix":     {"deps": [],
 							 "make": lambda ctx: make_sex_race_matrix(),
-							 "file": "kidney_model_sex_race_matrix.png"},
+							 "file": "kidney_model_sex_race_matrix.pdf"},
 	"age_race_sex_matrix": {"deps": [],
 							 "make": lambda ctx: make_age_race_sex_matrix(),
-							 "file": "kidney_model_age_race_sex_matrix.png"},
+							 "file": "kidney_model_age_race_sex_matrix.pdf"},
 	"race":                {"deps": ["race"],
 							 "make": lambda ctx: make_race_figure(ctx["race"], age_at_donation=40),
-							 "file": "kidney_model_race.png"},
+							 "file": "kidney_model_race.pdf"},
 	"sex":                 {"deps": ["sex"],
 							 "make": lambda ctx: make_sex_figure(ctx["sex"]),
-							 "file": "kidney_model_sex.png"},
+							 "file": "kidney_model_sex.pdf"},
 	"table":               {"deps": ["base", "psa", "owsa", "hr_scenarios", "age", "race", "sex"],
 							 "make": lambda ctx: make_results_table(
 								 ctx["base"], ctx["psa"], ctx["owsa"],

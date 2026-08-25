@@ -445,28 +445,28 @@ def main(age_at_esrd: int = 60, n: int = N_PER_ARM):
 
     # ── FIGURES ───────────────────────────────────────────────────────────────
     fig_occ = make_fig_state_occupancy(trace_p, trace_s, n, age_at_esrd)
-    occ_path = RESULTS / "esrd_conditional_state_occupancy.png"
+    occ_path = RESULTS / "esrd_conditional_state_occupancy.pdf"
     fig_occ.savefig(occ_path, dpi=150, bbox_inches="tight",
                     facecolor=fig_occ.get_facecolor())
     plt.close()
     print(f"Figure saved: {occ_path}")
 
     fig_surv = make_fig_survival(trace_p, trace_s, n, age_at_esrd)
-    surv_path = RESULTS / "esrd_conditional_survival.png"
+    surv_path = RESULTS / "esrd_conditional_survival.pdf"
     fig_surv.savefig(surv_path, dpi=150, bbox_inches="tight",
                      facecolor=fig_surv.get_facecolor())
     plt.close()
     print(f"Figure saved: {surv_path}")
 
     fig_tornado = make_fig_tornado(owsa_results, base_diff_days)
-    tornado_path = RESULTS / "esrd_conditional_owsa_tornado.png"
+    tornado_path = RESULTS / "esrd_conditional_owsa_tornado.pdf"
     fig_tornado.savefig(tornado_path, dpi=150, bbox_inches="tight",
                         facecolor=fig_tornado.get_facecolor())
     plt.close()
     print(f"Figure saved: {tornado_path}")
 
     fig_age = make_fig_age_sweep(age_results)
-    age_path = RESULTS / "esrd_conditional_age_sweep.png"
+    age_path = RESULTS / "esrd_conditional_age_sweep.pdf"
     fig_age.savefig(age_path, dpi=150, bbox_inches="tight",
                     facecolor=fig_age.get_facecolor())
     plt.close()
