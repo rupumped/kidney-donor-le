@@ -20,6 +20,28 @@
     "esrd_15yr_nodonate_white_female_pct": 0.04,
     "esrd_15yr_nodonate_black_sexavg_pct": 0.195,
     "esrd_15yr_nodonate_white_sexavg_pct": 0.05,
+    "esrd_15yr_nodonate_by_age_pct": {
+      "black_male": {
+        "20": 0.08,
+        "40": 0.24,
+        "60": 0.32
+      },
+      "black_female": {
+        "20": 0.05,
+        "40": 0.15,
+        "60": 0.18
+      },
+      "white_male": {
+        "20": 0.02,
+        "40": 0.06,
+        "60": 0.13
+      },
+      "white_female": {
+        "20": 0.01,
+        "40": 0.04,
+        "60": 0.08
+      }
+    },
     "donation_multiplier_vs_projection_range": [
       3.5,
       5.3
@@ -30,7 +52,7 @@
     "hr_black_race": 2.96,
     "hr_male_sex": 1.88,
     "hr_age_per_10yr_nonblack": 1.4,
-    "hr_age_per_10yr_nondonor": 1.4,
+    "hr_age_per_10yr_black": 0.88,
     "esrd_cum_incidence_5yr_per10k": 1.0,
     "esrd_cum_incidence_10yr_per10k": 6.0,
     "esrd_cum_incidence_15yr_per10k": 16.0,
@@ -77,6 +99,51 @@
     "pct_inactive_90d_to_1yr": 0.18,
     "pct_inactive_over_1yr": 0.14,
     "_note": "The 145-day figure in the original research plan was pre-KAS. Post-KAS confirmed values are 93\u2013103 days from listing, ~23 days from activation. The administrative friction of inactive listing is a real-world parameter that should be captured in sensitivity analyses."
+  },
+  "muzaale2016": {
+    "n_donors_esrd": 99,
+    "median_age_at_esrd": 50,
+    "n_preemptive": 21,
+    "listed_12mo_donor": 0.434,
+    "listed_12mo_nondonor": 0.256,
+    "wait_median_months_donor": 2.8,
+    "wait_median_months_nondonor": 21.5,
+    "mort_after_esrd_donor": {
+      "1": 0.091,
+      "3": 0.202,
+      "5": 0.255,
+      "10": 0.324
+    },
+    "mort_after_esrd_donor_ci": {
+      "1": [
+        0.048,
+        0.167
+      ],
+      "3": [
+        0.136,
+        0.296
+      ],
+      "5": [
+        0.178,
+        0.358
+      ],
+      "10": [
+        0.213,
+        0.474
+      ]
+    },
+    "mort_after_esrd_nondonor": {
+      "1": 0.156,
+      "3": 0.261,
+      "5": 0.349,
+      "10": 0.43
+    },
+    "hr_mort_after_esrd": 0.7,
+    "hr_posttx_mort_adjusted": 0.7,
+    "hr_posttx_mort_ci": [
+      0.2,
+      2.4
+    ]
   },
   "segev2010": {
     "perioperative_mortality_per_10k": 3.1,

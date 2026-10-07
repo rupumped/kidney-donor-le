@@ -24,8 +24,11 @@ priority is for deceased-donor allocation; LDKT outcomes tested in sensitivity.
 
 Non-Markovian dialysis mortality is handled by state-splitting (same approach
 as 07_cohort_markov.py):
-  D1  ESRD / dialysis year 1  (22% annual mortality)
-  D2  ESRD / dialysis year 2+ (17% annual mortality)
+  D1  ESRD / dialysis year 1  (age-banded USRDS mortality × first-year multiplier)
+  D2  ESRD / dialysis year 2+ (age-banded USRDS mortality)
+All post-ESRD state mortality is floored at the life-table qx (utils.py).
+Voucher holders are not donors, so neither arm uses the prior-donor
+(Muzaale 2016) post-ESRD inputs; only waitlist priority differs.
 
 States:
   H    Healthy
@@ -57,7 +60,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import (load_life_table, load_params, DATA_PROC, RESULTS,
                    weibull_annual_prob, weibull_scale_from_cumrisk_competing,
-                   mean_to_annual_tx_prob)
+                   mean_to_annual_tx_prob, dialysis_annual_mort,
+                   posttx_annual_mort, waitlist_annual_mort_at, graft_annual_fail,
+                   grams_nondonor_age_scale)
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
 N_PER_ARM = 1_000_000
@@ -82,30 +87,6 @@ _STATE_COLORS = {
 
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
-def _ptx_mort(p: dict, age: int, ldkt: bool = False) -> float:
-    """Age-stratified annual post-Tx mortality. DDKT base; LDKT for sensitivity."""
-    prefix = "posttx_ld_" if ldkt else "posttx_"
-    fallback = float(p.get("posttx_ld_annual_mort" if ldkt else "posttx_annual_mort",
-                           p["posttx_annual_mort"]))
-    if age < 35:   return float(p.get(f"{prefix}annual_mort_age1834", fallback))
-    elif age < 50: return float(p.get(f"{prefix}annual_mort_age3549", fallback))
-    elif age < 65: return float(p.get(f"{prefix}annual_mort_age5064", fallback))
-    else:          return float(p.get(f"{prefix}annual_mort_age65p",  fallback))
-
-
-def _graft_fail_rate(p: dict, age: int) -> float:
-    """Age-stratified post-year-1 graft failure (SRTR 2023 ADR Figure KI 53)."""
-    base = p.get("graft_annual_fail_postyear1", 0.025)
-    if age < 35:   return float(p.get("graft_annual_fail_postyear1_age1834", base))
-    elif age < 50: return float(p.get("graft_annual_fail_postyear1_age3549", base))
-    elif age < 65: return float(p.get("graft_annual_fail_postyear1_age5064", base))
-    else:          return float(p.get("graft_annual_fail_postyear1_age65p",  base))
-
-
-def _wl_mort(p: dict) -> float:
-    return float(1.0 - np.exp(-p["wl_mort_per_100py"] / 100))
-
-
 # ── COHORT SIMULATION ─────────────────────────────────────────────────────────
 def run_arm(p: dict, n: float, age_at_entry: int, voucher: bool,
             esrd_cum_risk_15: float = None, ldkt: bool = False,
@@ -125,7 +106,8 @@ def run_arm(p: dict, n: float, age_at_entry: int, voucher: bool,
         True  → priority waitlist (~100-day median) upon ESRD onset.
         False → standard waitlist (~1,765-day median) upon ESRD onset.
     esrd_cum_risk_15 : float, optional
-        15-year competing-risk ESRD CIF. Defaults to non-donor overall.
+        15-year competing-risk ESRD CIF at age_at_entry. Defaults to the
+        non-donor overall (age-40) rate scaled by the Grams 2016 age gradient.
     ldkt : bool
         True → use LDKT post-Tx mortality (sensitivity). Default: DDKT.
     life_table : np.ndarray, optional
@@ -142,11 +124,8 @@ def run_arm(p: dict, n: float, age_at_entry: int, voucher: bool,
 
     mean_days = float(p["wl_pld_mean_days"] if voucher else p["wl_std_mean_days"])
     wl_tx     = float(mean_to_annual_tx_prob(mean_days))
-    wl_mort    = _wl_mort(p)
     wl_remove  = float(p["wl_removal_rate_yr"])
     wl_listing = float(p.get("wl_listing_prob", 0.15))
-    dial_mort1 = float(p["dialysis_1yr_mort"])
-    dial_mort  = float(p["dialysis_annual_mort"])
 
     # Voucher holders are part of the living-donation ecosystem; they're informed
     # and monitored, making preemptive listing more likely (base: 9.4%, same as
@@ -157,7 +136,7 @@ def run_arm(p: dict, n: float, age_at_entry: int, voucher: bool,
 
     # Both arms carry non-donor (baseline) ESRD risk
     cum_risk_15 = esrd_cum_risk_15 if esrd_cum_risk_15 is not None \
-                  else float(p["esrd_15yr_nondonor"])
+                  else float(p["esrd_15yr_nondonor"]) * grams_nondonor_age_scale(p, age_at_entry)
     wbl_k   = float(p["weibull_shape"])
     wbl_lam = weibull_scale_from_cumrisk_competing(
         cum_risk_15, wbl_k, lt, age_at_entry, bg_hr=1.0
@@ -177,8 +156,13 @@ def run_arm(p: dict, n: float, age_at_entry: int, voucher: bool,
         age   = age_at_entry + yr
         q_bg  = lt[min(age, MAX_AGE)]          # background mortality (HR=1.0 both arms)
         p_esrd = weibull_annual_prob(float(yr), wbl_lam, wbl_k)
-        ptx_m  = _ptx_mort(p, age, ldkt=ldkt)
-        graft_fail = _graft_fail_rate(p, age)
+        # Post-ESRD state mortality: age-dependent, floored at life-table qx.
+        # Voucher holders are not donors, so general-population ESRD inputs.
+        dial_mort1 = dialysis_annual_mort(p, age, first_year=True,  q_floor=q_bg)
+        dial_mort  = dialysis_annual_mort(p, age, first_year=False, q_floor=q_bg)
+        wl_mort    = waitlist_annual_mort_at(p, age, q_floor=q_bg)
+        ptx_m      = posttx_annual_mort(p, age, ldkt=ldkt, q_floor=q_bg)
+        graft_fail = graft_annual_fail(p, age)
 
         # H (Healthy)
         H_die        = H * q_bg
@@ -410,10 +394,14 @@ def main(age_at_entry: int = 40, n: int = N_PER_ARM):
     # ── ESRD RISK SUBGROUPS ───────────────────────────────────────────────────
     print("SUBGROUP ANALYSIS BY ESRD RISK")
     print("-" * 40)
+    # Age-40 baselines scaled to age_at_entry by the Grams 2016 age gradient
     subgroups = [
-        ("Overall non-donor",    p["esrd_15yr_nondonor"]),
-        ("Black non-donor",      p["esrd_15yr_nondonor_black"]),
-        ("White non-donor",      p["esrd_15yr_nondonor_white"]),
+        ("Overall non-donor",    p["esrd_15yr_nondonor"]
+                                 * grams_nondonor_age_scale(p, age_at_entry)),
+        ("Black non-donor",      p["esrd_15yr_nondonor_black"]
+                                 * grams_nondonor_age_scale(p, age_at_entry, "Black")),
+        ("White non-donor",      p["esrd_15yr_nondonor_white"]
+                                 * grams_nondonor_age_scale(p, age_at_entry, "White")),
     ]
     for label, risk in subgroups:
         le_a, _ = run_arm(p, n, age_at_entry, voucher=True,  esrd_cum_risk_15=risk)
@@ -531,7 +519,7 @@ def main(age_at_entry: int = 40, n: int = N_PER_ARM):
     print(f"    with no countervailing elevated ESRD risk (unlike donors).")
     print()
     print("  Comparison to prior living donor analysis (07_cohort_markov.py):")
-    print("    Donor ΔLE ≈ −912 days (net harm: time-varying donor mortality HR dominates)")
+    print("    Donor ΔLE ≈ −891 days (net harm: time-varying donor mortality HR dominates)")
     print(f"    Voucher ΔLE ≈ +{base_diff_days:.1f} days (net benefit: priority with no added risk)")
     print()
     print("  Largest sensitivity drivers (see tornado plot):")

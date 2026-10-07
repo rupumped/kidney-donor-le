@@ -3,9 +3,11 @@
 ─────────────────
 Face-validity and calibration checks for the kidney donation Markov model.
 
-Two comparisons are run:
+Four comparisons are run:
   1. 3-year waitlist outcomes vs SRTR 2023 ADR Figure KI 22
   2. Post-transplant 5-year patient survival vs SRTR 2023 ADR Figure KI 70
+  3. Mortality after ESRD, prior donors vs matched non-donors (Muzaale 2016)
+  4. Dialysis life expectancy by age vs USRDS 2023 ADR Table 6.1
 
 Circularity is noted for each row:
   NON-CIRCULAR  Parameter was NOT derived from this observable → genuine test
@@ -23,10 +25,21 @@ import math
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from utils import load_params, DATA_PROC, RESULTS, mean_to_annual_tx_prob
+from utils import (load_params, DATA_PROC, RESULTS, mean_to_annual_tx_prob,
+                   load_life_table, dialysis_annual_mort, esrd_onset_mortality_curve)
 
 BASE = load_params()
+LT   = load_life_table(DATA_PROC / "lifetable_combined_2021.csv")
 W = 72
+
+
+def load_json(path):
+    import json
+    with open(path) as f:
+        return json.load(f)
+
+
+LIT = load_json(DATA_PROC / "literature_params.json")
 
 
 # ── FORMATTING ────────────────────────────────────────────────────────────────
@@ -156,6 +169,98 @@ def check_posttx_survival():
     return "\n".join(lines)
 
 
+# ── CHECK 3: MORTALITY AFTER ESRD — PRIOR DONORS VS MATCHED NON-DONORS ────────
+
+def check_mortality_after_esrd():
+    """
+    Cumulative mortality 1/3/5/10 yr after ESRD onset at age 50 (Muzaale 2016
+    median), donor pathway vs general pathway, against Muzaale 2016.
+
+    Donor     CIRCULAR      donor_dialysis_mort_mult and donor_wl_listing_prob
+                            were fit to this curve (05_assemble_parameters.py).
+    General   NON-CIRCULAR  General pathway uses USRDS/SRTR inputs only.
+                            Muzaale's matched non-donors are an imperfect
+                            comparator: ESRD 1994–2011, 39% LDKT, 21.5-month
+                            median wait vs the model's post-KAS250 standard
+                            arm (1,765-day mean wait).
+    """
+    m16 = LIT["muzaale2016"]
+    years = [1, 3, 5, 10]
+    age = int(m16["median_age_at_esrd"])
+    donor = esrd_onset_mortality_curve(BASE, age, True, years, LT)
+    gen   = esrd_onset_mortality_curve(BASE, age, False, years, LT)
+    # General pathway with Muzaale-like transplant access, to size how much of
+    # the gap access explains (median 21.5 mo → exponential mean = median/ln2)
+    gen_access = esrd_onset_mortality_curve(
+        dict(BASE, wl_std_mean_days=m16["wait_median_months_nondonor"] * 30.44 / math.log(2),
+             wl_listing_prob=0.22),
+        age, False, years, LT)
+
+    lines = [
+        _header(f"CHECK 3 — Mortality after ESRD onset at age {age}  "
+                "(Muzaale 2016, Transplantation 100:1306)"),
+        _colhead(),
+    ]
+    for t in years:
+        lo, hi = m16["mort_after_esrd_donor_ci"][str(t)]
+        lines.append(_row(f"Prior donor, {t:>2}-yr mortality", donor[t],
+                          m16["mort_after_esrd_donor"][str(t)], "CIRCULAR",
+                          f"95% CI {lo:.1%}–{hi:.1%}"))
+    for t in years:
+        lines.append(_row(f"General pathway, {t:>2}-yr mortality", gen[t],
+                          m16["mort_after_esrd_nondonor"][str(t)], "NON-CIRCULAR"))
+    lines += [
+        "",
+        "  Donor inputs: preemptive {:.1%}, listing {:.3f}/yr, dialysis mort ×{:.2f}, "
+        "post-Tx mort ×{:.2f}".format(
+            BASE["donor_esrd_preemptive_prob"], BASE["donor_wl_listing_prob"],
+            BASE["donor_dialysis_mort_mult"], BASE["donor_posttx_mort_mult"]),
+        "  [B] General pathway vs Muzaale non-donors: 3- and 5-yr mortality are",
+        "      reproduced within ~15%, but year 1 is under-predicted and year 10",
+        "      over-predicted. Observed ESRD mortality is front-loaded (frail",
+        "      patients die early, leaving a healthier pool); the model's",
+        "      homogeneous cohort has no such selection. Transplant access",
+        "      explains little of the gap: giving the general pathway Muzaale-like",
+        "      access (21.5-month median wait, ~26% listed by 12 mo) lowers 10-yr",
+        "      mortality only from {:.0%} to {:.0%}. The non-donor arm's ESRD".format(
+            gen[10], gen_access[10]),
+        "      incidence is ~0.04%/15 yr, so this has negligible effect on ΔLE, but",
+        "      it bears on the ESRD-conditional priority benefit (script 10).",
+    ]
+    return "\n".join(lines), donor, gen
+
+
+# ── CHECK 4: DIALYSIS LIFE EXPECTANCY VS USRDS TABLE 6.1 ──────────────────────
+
+def check_dialysis_le():
+    """
+    Remaining life expectancy on dialysis (no transplant) from the age-banded
+    annual mortality, vs USRDS 2023 ADR Table 6.1 (2019, sex-averaged).
+
+    SEMI-CIRCULAR  Both come from USRDS 2019 dialysis mortality, but Table 6.1
+                   uses 5-yr age groups while the model uses 4 broad bands and
+                   a constant-hazard conversion; this checks that the
+                   coarsening and conversion preserve life expectancy.
+    """
+    usrds = load_json(DATA_PROC / "usrds_mortality_params.json")
+    lines = [
+        _header("CHECK 4 — Dialysis life expectancy  (USRDS 2023 ADR Table 6.1, 2019)"),
+        f"  {'Age group':<20} {'Model':>7}  {'USRDS':>7}  {'Δ%':>6}",
+    ]
+    for grp, mid in [("40-44", 42), ("50-54", 52), ("60-64", 62),
+                     ("70-74", 72), ("80-84", 82)]:
+        f_, m_ = usrds.get(f"le_dialysis_female_{grp}"), usrds.get(f"le_dialysis_male_{grp}")
+        if f_ is None or m_ is None:
+            continue
+        obs = (f_ + m_) / 2
+        s, le = 1.0, 0.5   # mid-cycle correction for end-of-cycle accumulation
+        for age in range(mid, len(LT)):
+            s *= 1 - dialysis_annual_mort(BASE, age, q_floor=LT[age])
+            le += s
+        lines.append(f"  {grp:<20} {le:7.1f}  {obs:7.1f}  {100*(le-obs)/obs:+5.0f}%")
+    return "\n".join(lines)
+
+
 # ── SUMMARY ───────────────────────────────────────────────────────────────────
 
 def summary(wl_lines, posttx_lines):
@@ -209,8 +314,11 @@ def main():
 
     c1 = check_waitlist_outcomes()
     c2 = check_posttx_survival()
+    c3, _, _ = check_mortality_after_esrd()
+    c4 = check_dialysis_le()
     sm = summary(c1, c2)
-    report = heading + c1 + "\n\n" + c2 + "\n\n" + sm + "\n"
+    report = (heading + c1 + "\n\n" + c2 + "\n\n" + c3 + "\n\n" + c4
+              + "\n\n" + sm + "\n")
 
     print(report)
 

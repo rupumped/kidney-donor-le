@@ -33,7 +33,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import (load_life_table, load_params, DATA_PROC, RESULTS,
                    weibull_annual_prob, weibull_scale_from_cumrisk_competing,
-                   mean_to_annual_tx_prob, donor_mort_hr_at)
+                   mean_to_annual_tx_prob, donor_mort_hr_at,
+                   dialysis_annual_mort, posttx_annual_mort,
+                   waitlist_annual_mort_at, graft_annual_fail)
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
 N_PER_ARM = 1_000_000   # cohort size per arm (result is independent of this)
@@ -49,26 +51,6 @@ BASE = load_params()
 def _wl_tx_prob(p, priority: bool) -> float:
     mean_days = p["wl_pld_mean_days"] if priority else p["wl_std_mean_days"]
     return float(mean_to_annual_tx_prob(float(mean_days)))
-
-
-def _wl_mort(p) -> float:
-    return float(1.0 - np.exp(-p["wl_mort_per_100py"] / 100))
-
-
-def _ptx_mort(p, age: int) -> float:
-    if age < 35:   return float(p.get("posttx_annual_mort_age1834", p["posttx_annual_mort"]))
-    elif age < 50: return float(p.get("posttx_annual_mort_age3549", p["posttx_annual_mort"]))
-    elif age < 65: return float(p.get("posttx_annual_mort_age5064", p["posttx_annual_mort"]))
-    else:          return float(p.get("posttx_annual_mort_age65p",  p["posttx_annual_mort"]))
-
-
-def _graft_fail_rate(p, age: int) -> float:
-    """Age-stratified post-year-1 graft failure (SRTR 2023 ADR Figure KI 53)."""
-    base = p.get("graft_annual_fail_postyear1", 0.025)
-    if age < 35:   return float(p.get("graft_annual_fail_postyear1_age1834", base))
-    elif age < 50: return float(p.get("graft_annual_fail_postyear1_age3549", base))
-    elif age < 65: return float(p.get("graft_annual_fail_postyear1_age5064", base))
-    else:          return float(p.get("graft_annual_fail_postyear1_age65p",  base))
 
 
 # ── COHORT SIMULATION ─────────────────────────────────────────────────────────
@@ -87,11 +69,10 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool, life_table=None):
 
     # Pre-compute time-invariant transition probabilities
     wl_tx        = _wl_tx_prob(p, priority=donor)
-    wl_mort      = _wl_mort(p)
     wl_remove    = float(p["wl_removal_rate_yr"])
-    wl_listing   = float(p.get("wl_listing_prob", 1.0))
-    dial_mort1   = float(p["dialysis_1yr_mort"])
-    dial_mort    = float(p["dialysis_annual_mort"])
+    # Prior donors use Muzaale 2016 post-ESRD inputs; non-donors USRDS 2025 Ch.7
+    wl_listing   = float(p["donor_wl_listing_prob"] if donor
+                         else p.get("wl_listing_prob", 1.0))
     bg_hr_fn     = (lambda t: donor_mort_hr_at(
         t,
         p.get("donor_mort_hr_early", 1.0),
@@ -99,8 +80,8 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool, life_table=None):
         p.get("donor_mort_hr_t_start", 10.0),
         p.get("donor_mort_hr_t_end", 15.0),
     )) if donor else (lambda t: 1.0)
-    preemptive_p = float(p.get(
-        "esrd_preemptive_prob_pld" if donor else "esrd_preemptive_prob_std", 0.0))
+    preemptive_p = float(p["donor_esrd_preemptive_prob"] if donor
+                         else p.get("esrd_preemptive_prob_std", 0.0))
 
     # Weibull ESRD hazard calibrated to competing-risk 15-yr cumulative incidence
     cum_risk_15 = float(p["esrd_15yr_donor_overall"] if donor else p["esrd_15yr_nondonor"])
@@ -124,10 +105,15 @@ def run_arm(p, n: float, age_at_entry: int, donor: bool, life_table=None):
         age = age_at_entry + yr
 
         # ── Year-varying transition probabilities ──────────────────────────
-        q_bg   = lt[min(age, MAX_AGE)] * bg_hr_fn(yr)
+        qx     = lt[min(age, MAX_AGE)]
+        q_bg   = min(qx * bg_hr_fn(yr), 1.0)
         p_esrd = weibull_annual_prob(float(yr), wbl_lam, wbl_k)
-        ptx_m  = _ptx_mort(p, age)
-        graft_fail = _graft_fail_rate(p, age)
+        # Post-ESRD state mortality: age-dependent, floored at life-table qx
+        dial_mort1 = dialysis_annual_mort(p, age, first_year=True,  donor=donor, q_floor=qx)
+        dial_mort  = dialysis_annual_mort(p, age, first_year=False, donor=donor, q_floor=qx)
+        wl_mort    = waitlist_annual_mort_at(p, age, q_floor=qx)
+        ptx_m      = posttx_annual_mort(p, age, donor=donor, q_floor=qx)
+        graft_fail = graft_annual_fail(p, age)
 
         # ── H (Healthy) ───────────────────────────────────────────────────
         H_die        = H * q_bg

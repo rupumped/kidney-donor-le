@@ -24,13 +24,15 @@ Entry state:
   transitions directly to WL at cycle 0; the remainder begin in D1.
 
 No H (Healthy) state exists. State-specific mortalities (dialysis, waitlist,
-post-Tx) are all-cause rates measured in those populations and incorporate
-background aging; no separate life-table term is added to disease states.
-Post-transplant mortality is age-stratified as in scripts 07 and 09.
+post-Tx) are all-cause rates measured in those populations; dialysis and
+post-Tx rates are age-stratified, and all are floored at the life-table qx
+for the same age (utils.py) so they never fall below background mortality.
+Neither arm uses the prior-donor (Muzaale 2016) inputs: the comparison
+isolates priority access, not donor health.
 
 States:
-  D1   ESRD / dialysis year 1   (22 %/yr all-cause mortality)
-  D2   ESRD / dialysis year 2+  (17 %/yr all-cause mortality)
+  D1   ESRD / dialysis year 1   (USRDS age-banded mortality × first-year mult.)
+  D2   ESRD / dialysis year 2+  (USRDS age-banded mortality)
   WL   Waitlist — priority or standard
   PT   Post-transplant
   Dead Absorbing (tracked implicitly)
@@ -57,7 +59,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import (load_params, DATA_PROC, RESULTS,
-                   mean_to_annual_tx_prob, load_life_table)
+                   mean_to_annual_tx_prob, load_life_table, dialysis_annual_mort,
+                   posttx_annual_mort, waitlist_annual_mort_at, graft_annual_fail)
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
 N_PER_ARM = 1_000_000
@@ -82,26 +85,6 @@ FS_LABEL=14
 FS_TICK=13
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
-def _ptx_mort(p: dict, age: int, ldkt: bool = False) -> float:
-    """Age-stratified annual post-Tx all-cause mortality. DDKT base; LDKT sensitivity."""
-    prefix   = "posttx_ld_" if ldkt else "posttx_"
-    fallback = float(p.get("posttx_ld_annual_mort" if ldkt else "posttx_annual_mort",
-                           p["posttx_annual_mort"]))
-    if age < 35:   return float(p.get(f"{prefix}annual_mort_age1834", fallback))
-    elif age < 50: return float(p.get(f"{prefix}annual_mort_age3549", fallback))
-    elif age < 65: return float(p.get(f"{prefix}annual_mort_age5064", fallback))
-    else:          return float(p.get(f"{prefix}annual_mort_age65p",  fallback))
-
-
-def _graft_fail_rate(p: dict, age: int) -> float:
-    """Age-stratified post-year-1 graft failure (SRTR 2023 ADR Figure KI 53)."""
-    base = p.get("graft_annual_fail_postyear1", 0.025)
-    if age < 35:   return float(p.get("graft_annual_fail_postyear1_age1834", base))
-    elif age < 50: return float(p.get("graft_annual_fail_postyear1_age3549", base))
-    elif age < 65: return float(p.get("graft_annual_fail_postyear1_age5064", base))
-    else:          return float(p.get("graft_annual_fail_postyear1_age65p",  base))
-
-
 # ── COHORT SIMULATION ─────────────────────────────────────────────────────────
 def run_arm(p: dict, n: float, age_at_esrd: int, priority: bool,
             dial_mort_scale: float = 1.0, ldkt: bool = False):
@@ -135,11 +118,9 @@ def run_arm(p: dict, n: float, age_at_esrd: int, priority: bool,
     """
     mean_days = float(p["wl_pld_mean_days"] if priority else p["wl_std_mean_days"])
     wl_tx     = float(mean_to_annual_tx_prob(mean_days))
-    wl_mort    = float(1.0 - np.exp(-p["wl_mort_per_100py"] / 100))
     wl_remove  = float(p["wl_removal_rate_yr"])
     wl_listing = float(p.get("wl_listing_prob", 0.15))
-    dial_mort1 = float(p["dialysis_1yr_mort"])  * dial_mort_scale
-    dial_mort  = float(p["dialysis_annual_mort"]) * dial_mort_scale
+    p = {**p, "dialysis_mort_scale": p.get("dialysis_mort_scale", 1.0) * dial_mort_scale}
 
     # Preemptive listing: fraction of ESRD-onset patients listed before dialysis.
     # Priority arm uses the donor-like (informed) rate; standard arm uses the
@@ -161,8 +142,13 @@ def run_arm(p: dict, n: float, age_at_esrd: int, priority: bool,
 
     while D1 + D2 + WL + PT > 0.5:
         age   = age_at_esrd + yr
-        ptx_m = _ptx_mort(p, age, ldkt=ldkt)
-        graft_fail = _graft_fail_rate(p, age)
+        # Post-ESRD state mortality: age-dependent, floored at life-table qx
+        qx    = LIFE_TABLE_QX[min(age, MAX_AGE)]
+        dial_mort1 = dialysis_annual_mort(p, age, first_year=True,  q_floor=qx)
+        dial_mort  = dialysis_annual_mort(p, age, first_year=False, q_floor=qx)
+        wl_mort    = waitlist_annual_mort_at(p, age, q_floor=qx)
+        ptx_m      = posttx_annual_mort(p, age, ldkt=ldkt, q_floor=qx)
+        graft_fail = graft_annual_fail(p, age)
 
         # ── D1 (ESRD year 1) — all survivors leave D1 after one cycle ────────
         D1_die    = D1 * dial_mort1
@@ -481,15 +467,15 @@ def main(age_at_esrd: int = 60, n: int = N_PER_ARM):
           f"  (ESRD onset age {age_at_esrd})")
     print()
     print("  Comparison across scripts:")
-    print("    07 donor vs non-donor (pop. level):    ΔLE ≈ −912 days")
-    print(f"    09 voucher vs control (pop. level):    ΔLE ≈ +0.3 days")
+    print("    07 donor vs non-donor (pop. level):    ΔLE ≈ −891 days")
+    print(f"    09 voucher vs control (pop. level):    ΔLE ≈ +0.5 days")
     print(f"    10 priority vs standard | ESRD:        ΔLE ≈ {base_diff_days:+.1f} days  ←")
     print()
     print("  Interpretation:")
     print(f"    Among people who have already developed ESRD, priority")
     print(f"    waitlist access adds approximately {base_diff_days:.0f} days of life")
     print(f"    expectancy. This is the 'per-patient-who-needs-it' benefit;")
-    print(f"    it dilutes to ~+0.3 days at the population level (script 09)")
+    print(f"    it dilutes to ~+0.5 days at the population level (script 09)")
     print(f"    because only {BASE['esrd_15yr_nondonor']*100:.3f}% of non-donors develop")
     print(f"    ESRD within 15 years and most never reach the waitlist.")
     print()

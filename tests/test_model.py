@@ -14,20 +14,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from utils import (load_life_table, _hardcoded_base_params,
                    weibull_scale_from_cumrisk, weibull_scale_from_cumrisk_competing,
-                   weibull_annual_prob, median_to_annual_tx_prob)
+                   weibull_annual_prob, median_to_annual_tx_prob,
+                   dialysis_annual_mort, posttx_annual_mort, waitlist_annual_mort_at,
+                   esrd_onset_mortality_curve, grams_nondonor_age_scale)
 
 # Import model functions without running main
 import importlib.util, types
 
-def load_sim():
+def load_script(filename):
     spec = importlib.util.spec_from_file_location(
-        "sim", Path(__file__).resolve().parent.parent / "src" / "06_markov_simulation.py"
+        filename.split("_")[0], Path(__file__).resolve().parent.parent / "src" / filename
     )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
-SIM = load_sim()
+SIM = load_script("06_markov_simulation.py")
 BASE = _hardcoded_base_params()
 
 
@@ -216,8 +218,8 @@ class TestSimulation:
             rng   = np.random.default_rng(seed)
             wl_tx = SIM.waitlist_annual_tx_prob(params, priority)
             wl_m  = SIM.waitlist_annual_mort(params)
-            d_m   = params["dialysis_annual_mort"]
-            pt_m  = params["posttx_annual_mort"]
+            d_m   = dialysis_annual_mort(params, 50)
+            pt_m  = posttx_annual_mort(params, 50)
             for yr in range(50):
                 a = 50 + yr
                 if a >= 100: break
@@ -256,11 +258,87 @@ class TestSimulation:
 
 
 # ────────────────────────────────────────────────────────────────────────────
+class TestNonDonorAgeGradient:
+    """Non-donor ESRD baseline by age follows Grams 2016 projections."""
+
+    def test_reproduces_grams_cells(self):
+        for race, sex, a, expected in [("Black", "Male", 20, 0.0008), ("Black", "Male", 60, 0.0032),
+                                       ("White", "Female", 20, 0.0001), ("White", "Female", 60, 0.0008)]:
+            at40 = BASE[f"grams_nondonor_15yr_{race.lower()}_{sex.lower()}_age40"]
+            got = at40 * grams_nondonor_age_scale(BASE, a, race, sex)
+            assert abs(got - expected) < 1e-12, f"{race} {sex} age {a}: {got} vs {expected}"
+
+    def test_black_gradient_flatter_after_40(self):
+        black = grams_nondonor_age_scale(BASE, 60, "Black")
+        white = grams_nondonor_age_scale(BASE, 60, "White")
+        assert black < white, f"Grams: Black 40→60 rise ({black:.2f}×) < White ({white:.2f}×)"
+
+
+# ────────────────────────────────────────────────────────────────────────────
+class TestPostESRDMortality:
+    """Age-dependent post-ESRD mortality and the life-table floor."""
+
+    def test_never_below_background(self):
+        """Post-ESRD state mortality must never fall below general-population
+        qx at the same age, or ESRD becomes protective at old ages."""
+        qx = load_life_table()
+        for age in range(18, 101):
+            for donor in (False, True):
+                assert dialysis_annual_mort(BASE, age, donor=donor, q_floor=qx[age]) >= qx[age]
+                assert posttx_annual_mort(BASE, age, donor=donor, q_floor=qx[age]) >= qx[age]
+            assert waitlist_annual_mort_at(BASE, age, q_floor=qx[age]) >= qx[age]
+
+    def test_dialysis_mortality_rises_with_age(self):
+        ages = [30, 50, 70, 80]
+        q = [dialysis_annual_mort(BASE, a) for a in ages]
+        assert q == sorted(q) and q[0] < q[-1], f"Dialysis mortality should rise with age: {q}"
+
+    def test_no_jumps_at_band_edges(self):
+        """Interpolated age curves must not step at registry band edges
+        (steps produced a spurious bump in the ESRD-conditional age sweep)."""
+        for f in (dialysis_annual_mort, posttx_annual_mort, waitlist_annual_mort_at):
+            for age in range(20, 95):
+                a, b = f(BASE, age), f(BASE, age + 1)
+                assert abs(b / a - 1) < 0.10, f"{f.__name__} jumps {a:.4f}→{b:.4f} at {age}→{age+1}"
+
+    def test_donor_dialysis_mortality_lower(self):
+        """Muzaale 2016: prior donors with ESRD have lower mortality than
+        general ESRD patients of the same age."""
+        assert dialysis_annual_mort(BASE, 50, donor=True) < dialysis_annual_mort(BASE, 50)
+
+    def test_more_esrd_never_helps(self):
+        """With no excess all-cause mortality, raising donor ESRD risk must
+        lower donor LE. Regression test: without the background floor, even
+        donor-specific (lower) ESRD mortality made ESRD net-protective."""
+        # Worst case for the paradox: older entry, every ESRD patient listed
+        # preemptively and transplanted fast, so most post-ESRD time is spent
+        # post-Tx at old ages where unfloored post-Tx mortality < qx.
+        p = dict(BASE, donor_mort_hr_late=1.0, donor_esrd_preemptive_prob=1.0)
+        le = [SIM.run_arm_analytic(dict(p, esrd_15yr_donor_overall=r), 70, donor=True)
+              for r in (0.001, 0.01, 0.05)]
+        assert le[0] > le[1] > le[2], f"LE should fall as ESRD risk rises: {le}"
+
+    def test_curve_matches_esrd_conditional_model(self):
+        """utils.esrd_onset_mortality_curve (used for calibration) must match
+        script 10's ESRD-conditional cohort for the general pathway."""
+        m10 = load_script("10_esrd_conditional_cohort_markov.py")
+        p = dict(m10.BASE)
+        n = 1e6   # run_arm stops below 0.5 survivors, so n must be large
+        _, trace, _ = m10.run_arm(p, n, 50, priority=False)
+        curve = esrd_onset_mortality_curve(p, 50, False, [1, 3, 5, 10], m10.LIFE_TABLE_QX)
+        for t in (1, 3, 5, 10):
+            mort10 = 1 - trace[t - 1]["alive"] / n
+            assert abs(mort10 - curve[t]) < 1e-9, \
+                f"Mortality at {t} yr differs: script 10 {mort10:.6f} vs utils {curve[t]:.6f}"
+
+
+# ────────────────────────────────────────────────────────────────────────────
 def run_all_tests():
     """Run all tests without pytest."""
     import traceback
     classes = [TestLifeTable, TestWeibullCalibration,
-               TestWaitlistTransitions, TestSimulation]
+               TestWaitlistTransitions, TestSimulation, TestPostESRDMortality,
+               TestNonDonorAgeGradient]
     passed = failed = 0
     for cls in classes:
         obj = cls()

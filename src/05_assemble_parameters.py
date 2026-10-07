@@ -15,6 +15,10 @@ Key reconciliation decisions:
      5 published cumulative-incidence curves (median, IQR, 1st/99th pct)
   5. Race-specific waitlist/post-tx parameters from SRTR 2023 ADR
   6. wl_listing_prob=0.15 calibrated from USRDS 2025 ADR ESRD Ch.7 Figs 7.13/7.15/7.17
+  7. Dialysis mortality age-stratified from USRDS 2023 ADR Ch.6 (Fig 6.5b, 2019)
+  8. Prior-donor post-ESRD pathway from Muzaale 2016 (direct + calibrated inputs)
+  9. Waitlist mortality age-stratified from SRTR 2023 ADR KI 25 (2019)
+ 10. Non-donor ESRD age gradient from Grams 2016 by race and sex (ages 20/40/60)
 
 Output:
   data/processed/params.json
@@ -23,11 +27,13 @@ Output:
 import sys
 import json
 import math
+import numpy as np
 from pathlib import Path
 
 # Allow running from repo root or src/
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from utils import DATA_PROC, save_params, _hardcoded_base_params, massie_weibull_fit
+from utils import (DATA_PROC, save_params, _hardcoded_base_params, massie_weibull_fit,
+                   load_life_table, dialysis_annual_mort, esrd_onset_mortality_curve)
 
 
 def load_json(path: Path) -> dict:
@@ -37,6 +43,44 @@ def load_json(path: Path) -> dict:
     return {}
 
 
+def calibrate_donor_esrd_pathway(params: dict, m16: dict) -> dict:
+    """
+    Fit donor_dialysis_mort_mult and donor_wl_listing_prob to Muzaale 2016.
+
+    For each candidate multiplier on a grid, the listing probability is solved
+    in closed form so the cohort listed by 12 months matches the observed
+    43.4% (preemptive + dialysis-year-1 survivors × listing prob); the
+    multiplier minimizing squared error against the observed 1/3/5/10-yr
+    mortality after ESRD is kept. Cohort enters ESRD at the study's median
+    age (50). An absolute fit is used rather than one relative to Muzaale's
+    matched non-donors: their comparator had 39% LDKT and a 21.5-month median
+    wait, so the general-path mismatch reflects transplant access, not a
+    dialysis-era effect that would cancel (see 08_calibration.py, CHECK 3).
+    """
+    lt  = load_life_table(DATA_PROC / "lifetable_combined_2021.csv")
+    age = int(m16.get("median_age_at_esrd", 50))
+    obs = {int(k): v for k, v in m16.get(
+        "mort_after_esrd_donor", {"1": 0.091, "3": 0.202, "5": 0.255, "10": 0.324}).items()}
+    listed_12mo = m16.get("listed_12mo_donor", 0.434)
+    pre = params["donor_esrd_preemptive_prob"]
+    years = sorted(obs)
+
+    best = None
+    for mult in np.arange(0.05, 2.5001, 0.005):
+        p = dict(params, donor_dialysis_mort_mult=float(mult))
+        dm1 = dialysis_annual_mort(p, age, first_year=True, donor=True, q_floor=lt[age])
+        p["donor_wl_listing_prob"] = float(np.clip(
+            (listed_12mo - pre) / ((1 - pre) * (1 - dm1)), 0.0, 1.0))
+        curve = esrd_onset_mortality_curve(p, age, True, years, lt)
+        sse = sum((curve[t] - obs[t]) ** 2 for t in years)
+        if best is None or sse < best[0]:
+            best = (sse, p["donor_dialysis_mort_mult"], p["donor_wl_listing_prob"])
+
+    _, mult, listing = best
+    return {"donor_dialysis_mort_mult": round(mult, 3),
+            "donor_wl_listing_prob":    round(listing, 4)}
+
+
 def main():
     print("=== 05_assemble_parameters.py ===\n")
 
@@ -44,6 +88,7 @@ def main():
     lit      = load_json(DATA_PROC / "literature_params.json")
     usrds    = load_json(DATA_PROC / "usrds_params.json")
     usrds_e7 = load_json(DATA_PROC / "usrds_esrd7_params.json")
+    usrds_mort = load_json(DATA_PROC / "usrds_mortality_params.json")
     srtr     = load_json(DATA_PROC / "srtr_params.json")
 
     muz = lit.get("muzaale2014", {})
@@ -53,6 +98,7 @@ def main():
     w   = lit.get("wainright2017", {})
 
     params = {}
+    _fallback = _hardcoded_base_params()
 
     # ── ESRD RISK ─────────────────────────────────────────────────────────
     # Donor values: Muzaale 2014
@@ -89,11 +135,26 @@ def main():
     params["hr_black_race"]             = mas.get("hr_black_race", 2.96)
     params["hr_male_sex"]               = mas.get("hr_male_sex", 1.88)
     params["hr_age_per_decade_nonblack"] = mas.get("hr_age_per_10yr_nonblack", 1.40)
-    params["hr_age_per_decade_nondonor"] = mas.get("hr_age_per_10yr_nondonor", 1.40)
+    # Non-donor age gradient: Grams 2016 projections at ages 20/40/60 by race
+    # and sex (RECONCILIATION DECISION 10), replacing a borrowed 1.40/decade
+    # proxy that overstated Black non-donor risk away from age 40.
+    for cell, by_age in gr.get("esrd_15yr_nodonate_by_age_pct", {}).items():
+        for a, pct in by_age.items():
+            params[f"grams_nondonor_15yr_{cell}_age{a}"] = pct / 100
+    for k, v in _fallback.items():
+        if k.startswith("grams_nondonor_15yr_"):
+            params.setdefault(k, v)
 
     # ── DIALYSIS / ESRD SURVIVAL ──────────────────────────────────────────
-    params["dialysis_1yr_mort"]        = usrds.get("hd_1yr_mortality", 0.22)
-    params["dialysis_annual_mort"]     = usrds.get("hd_annual_mort_postyear1", 0.17)
+    # Age-stratified (RECONCILIATION DECISION 7): USRDS 2023 ADR Fig 6.5b,
+    # 2019 adjusted; first-year multiplier from Fig 6.4. Replaces the former
+    # all-ages 22%/17% rates, which are dominated by older patients.
+    for band in ("age1844", "age4564", "age6574", "age75p"):
+        key = f"dialysis_mort_{band}"
+        params[key] = usrds_mort.get(key, _fallback[key])
+    params["dialysis_yr1_mult"]   = usrds_mort.get("dialysis_yr1_mult",
+                                                   _fallback["dialysis_yr1_mult"])
+    params["dialysis_mort_scale"] = 1.0   # uniform sensitivity scale
 
     # ── WAITLIST OUTCOMES ─────────────────────────────────────────────────
     # Key uses 2023 suffix; 2022 fallback retained for backwards compatibility
@@ -103,6 +164,19 @@ def main():
     )
     params["wl_mort_black_per_100py"]    = srtr.get("pretx_mort_per_100py_black", 4.62)
     params["wl_mort_white_per_100py"]    = srtr.get("pretx_mort_per_100py_white", 5.71)
+    # By age (KI 25), 2019 to match the USRDS dialysis year — used by the model
+    # (RECONCILIATION DECISION 9); the all-ages rates above remain for the
+    # SRTR KI 22 calibration check in 08_calibration.py.
+    for band in ("age1834", "age3549", "age5064", "age65p"):
+        key = f"wl_mort_per_100py_{band}"
+        params[key] = srtr.get(f"pretx_mort_per_100py_{band}_2019", _fallback[key])
+    # Race ÷ overall (KI 26 / KI 24, 2019), applied to the age table in race
+    # subgroups, assuming race and age act multiplicatively
+    _overall_19 = srtr.get("pretx_mort_per_100py_overall_2019", 4.78)
+    params["wl_mort_race_mult"] = 1.0
+    for race, fb in (("black", 4.47), ("white", 5.57)):
+        params[f"wl_mort_race_mult_{race}"] = round(
+            srtr.get(f"pretx_mort_per_100py_{race}_2019", fb) / _overall_19, 4)
     params["wl_removal_rate_yr"]         = srtr.get("wl_annual_removal_competing", 0.1260)
 
     # Wait times: post-KAS250 figures (RECONCILIATION DECISION 2)
@@ -208,6 +282,18 @@ def main():
     params["donor_mort_hr_t_start"] = 10.0
     params["donor_mort_hr_t_end"]   = 15.0
 
+    # ── PRIOR-DONOR POST-ESRD PATHWAY (RECONCILIATION DECISION 8) ─────────
+    # Donors who develop ESRD are followed closely, healthier, and listed
+    # earlier than the general ESRD population (Muzaale 2016). Direct inputs:
+    # preemptive fraction and post-Tx mortality HR. Calibrated inputs: listing
+    # rate (to 43.4% listed by 12 mo) and dialysis-mortality multiplier (to the
+    # 1/3/5/10-yr mortality-after-ESRD curve).
+    m16 = lit.get("muzaale2016", {})
+    params["donor_esrd_preemptive_prob"] = (
+        m16.get("n_preemptive", 21) / m16.get("n_donors_esrd", 99))
+    params["donor_posttx_mort_mult"] = m16.get("hr_posttx_mort_adjusted", 0.7)
+    params.update(calibrate_donor_esrd_pathway(params, m16))
+
     # ── METADATA ──────────────────────────────────────────────────────────
     params["_sources"] = {
         "esrd_donor_risk":        "Muzaale 2014 JAMA 311:579",
@@ -216,7 +302,10 @@ def main():
         "esrd_hr_within_donors":  "Massie 2017 JASN 28:2749",
         "weibull_shape":          "Fit via cloglog regression to Massie 2017's published "
                                   "cumulative-incidence curves (median, IQR, 1st/99th pct)",
-        "dialysis_survival":      "USRDS 2023/2024 ADR (hardcoded from published tables)",
+        "dialysis_survival":      "USRDS 2023 ADR ESRD Ch.6 Fig 6.5b (2019 adjusted, by age); "
+                                  "first-year multiplier Fig 6.4",
+        "donor_esrd_pathway":     "Muzaale 2016 Transplantation 100:1306 (preemptive 21/99; "
+                                  "post-Tx HR 0.7; listing and dialysis multiplier calibrated)",
         "waitlist_outcomes":      "SRTR 2023 ADR",
         "wl_listing_prob":        "USRDS 2025 ADR ESRD Vol. Ch.7 Figs 7.13/7.15/7.17",
         "pld_wait_time":          "Wainright 2017 AJT 17:1103; UNOS ATC abstract 2015",
@@ -241,6 +330,12 @@ def main():
         "(general ESRD p≈0.065/yr), scaled for donor-like 18-44 cohort via Figs 7.13+7.17 "
         "(post-dialysis yr1 listing ≈9.2%, conditional p≈0.17/yr); conservative base 0.15; "
         "sensitivity 0.05-0.30. Replaces prior placeholder 0.75.",
+        "Dialysis mortality age-stratified (USRDS 2023 Fig 6.5b, 2019 pre-COVID) instead of "
+        "all-ages 22%/17%; all post-ESRD state mortality floored at life-table qx.",
+        "Waitlist mortality by age from SRTR KI 25 (2019), race ratio from KI 26; all "
+        "age-banded inputs interpolated log-linearly between band midpoints.",
+        "Donor arm uses Muzaale 2016 prior-donor inputs after ESRD; voucher and ESRD-"
+        "conditional priority arms do not (they isolate priority access, not donor health).",
     ]
 
     save_params(params)
@@ -254,7 +349,14 @@ def main():
     print(f"  Nondonor ESRD 15yr (white):   {params['esrd_15yr_nondonor_white']:.4%}")
     print(f"  Weibull shape (fit):          {params['weibull_shape']:.4f}")
     print(f"  Weibull shape log-sigma (fit):{params['weibull_shape_log_sigma']:.4f}")
-    print(f"  Dialysis 1yr mortality:       {params['dialysis_1yr_mort']:.0%}")
+    print(f"  Dialysis mortality by age:    "
+          + " / ".join(f"{params[f'dialysis_mort_{b}']:.1%}"
+                       for b in ("age1844", "age4564", "age6574", "age75p"))
+          + f"  (yr-1 ×{params['dialysis_yr1_mult']:.2f})")
+    print(f"  Donor | ESRD: preemptive {params['donor_esrd_preemptive_prob']:.1%}, "
+          f"listing {params['donor_wl_listing_prob']:.3f}/yr, "
+          f"dialysis mort ×{params['donor_dialysis_mort_mult']:.2f}, "
+          f"post-Tx mort ×{params['donor_posttx_mort_mult']:.2f}")
     print(f"  Waitlist mort (overall):      {params['wl_mort_per_100py']:.1f}/100 PY")
     print(f"  Std wait (mean days):         {params['wl_std_mean_days']}")
     print(f"  PLD wait (mean days):         {params['wl_pld_mean_days']:.1f}")

@@ -11,6 +11,7 @@ Papers covered:
   - Massie 2017   (JASN 28:2749)       — post-donation ESRD hazard ratios
   - Mjøen 2014    (Kidney Int 86:162)  — Norwegian cohort (sensitivity upper bound)
   - Wainright 2017 (AJT 17:1103)      — PLD wait time post-KAS
+  - Muzaale 2016  (Transplantation 100:1306) — outcomes of donors who develop ESRD
   - Ibrahim 2009  (NEJM 360:459)       — long-term donor outcomes
   - Segev 2010    (JAMA 303:959)       — perioperative mortality and long-term survival
   - O'Keeffe 2018 (meta-analysis, PubMed 29379948) — all-cause mortality RR
@@ -88,6 +89,16 @@ LITERATURE_PARAMS = {
         "esrd_15yr_nodonate_black_sexavg_pct": 0.195,  # (0.24+0.15)/2
         "esrd_15yr_nodonate_white_sexavg_pct": 0.050,  # (0.06+0.04)/2
 
+        # Same projections at ages 20 / 40 / 60 (base-case candidates; PMC4758367
+        # text). Gives the non-donor age gradient by race and sex: Black risk
+        # flattens after 40 (≈1.13×/decade 40→60) vs White (≈1.45×/decade).
+        "esrd_15yr_nodonate_by_age_pct": {
+            "black_male":   {"20": 0.08, "40": 0.24, "60": 0.32},
+            "black_female": {"20": 0.05, "40": 0.15, "60": 0.18},
+            "white_male":   {"20": 0.02, "40": 0.06, "60": 0.13},
+            "white_female": {"20": 0.01, "40": 0.04, "60": 0.08},
+        },
+
         # Key finding: lifetime ESRD risk highest at youngest ages, esp. young Black
         # Post-donation 15-yr risk was 3.5–5.3× higher than these projections
         "donation_multiplier_vs_projection_range": [3.5, 5.3],
@@ -110,9 +121,8 @@ LITERATURE_PARAMS = {
         "hr_black_race":                    2.96,   # 95% CI 2.25–3.89
         "hr_male_sex":                      1.88,   # 95% CI 1.50–2.35
         "hr_age_per_10yr_nonblack":         1.40,   # 95% CI 1.23–1.59
-        # Population ESRD incidence shows a similar age gradient for non-donors;
-        # we use the same 1.40/decade as an approximation to apply symmetrically.
-        "hr_age_per_10yr_nondonor":         1.40,
+        "hr_age_per_10yr_black":            0.88,   # 95% CI 0.72–1.09 (p=0.3)
+        # Non-donor age gradient comes from Grams 2016 by age (not this paper).
 
         # Cumulative incidence by time point (per 10,000 donors), median curve
         "esrd_cum_incidence_5yr_per10k":    1.0,    # range 1–2
@@ -213,6 +223,43 @@ LITERATURE_PARAMS = {
             "from activation. The administrative friction of inactive listing is "
             "a real-world parameter that should be captured in sensitivity analyses."
         ),
+    },
+
+    # ════════════════════════════════════════════════════════════════════════
+    # MUZAALE 2016 — Outcomes of Live Kidney Donors Who Develop ESRD
+    # Transplantation 2016;100(6):1306–1312  PMCID: PMC4826649
+    # Design: 99 US donors (1994–2011) who developed ESRD vs matched non-donors
+    #         with ESRD (USRDS/SRTR); median age at ESRD 50 in both groups.
+    # Source of donor-specific post-ESRD inputs (preemptive listing, listing
+    # rate, mortality after ESRD, post-transplant mortality). Small cohort →
+    # wide CIs, propagated in the PSA.
+    # ════════════════════════════════════════════════════════════════════════
+    "muzaale2016": {
+        "n_donors_esrd":                     99,
+        "median_age_at_esrd":                50,
+
+        # Pathway after ESRD: 20 listed preemptively + 1 preemptive LDKT
+        # without listing → 21/99 avoided dialysis at onset
+        "n_preemptive":                      21,
+
+        # Cumulative listing within 12 months of ESRD (includes preemptive)
+        "listed_12mo_donor":              0.434,   # 95% CI 0.34–0.54
+        "listed_12mo_nondonor":           0.256,   # 95% CI 0.218–0.299
+
+        # Listing → transplant median (months); donors 13% LDKT / 87% SCD DDKT
+        "wait_median_months_donor":         2.8,
+        "wait_median_months_nondonor":     21.5,
+
+        # Cumulative all-cause mortality after ESRD onset (1/3/5/10 yr)
+        "mort_after_esrd_donor":     {"1": 0.091, "3": 0.202, "5": 0.255, "10": 0.324},
+        "mort_after_esrd_donor_ci":  {"1": [0.048, 0.167], "3": [0.136, 0.296],
+                                      "5": [0.178, 0.358], "10": [0.213, 0.474]},
+        "mort_after_esrd_nondonor":  {"1": 0.156, "3": 0.261, "5": 0.349, "10": 0.430},
+        "hr_mort_after_esrd":               0.7,   # 95% CI 0.4–1.0
+
+        # Post-transplant mortality, donors vs matched non-donor recipients
+        "hr_posttx_mort_adjusted":          0.7,   # 95% CI 0.2–2.4
+        "hr_posttx_mort_ci":           [0.2, 2.4],
     },
 
     # ════════════════════════════════════════════════════════════════════════

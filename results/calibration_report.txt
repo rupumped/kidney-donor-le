@@ -53,6 +53,47 @@
 
 
 ────────────────────────────────────────────────────────────────────────
+  CHECK 3 — Mortality after ESRD onset at age 50  (Muzaale 2016, Transplantation 100:1306)
+────────────────────────────────────────────────────────────────────────
+  Outcome                                     Model    Obs.      Δ%  Status
+  Prior donor,  1-yr mortality                 7.6%    9.1%    -17%  * circular  
+    -> 95% CI 4.8%–16.7%
+  Prior donor,  3-yr mortality                17.2%   20.2%    -15%  * circular  
+    -> 95% CI 13.6%–29.6%
+  Prior donor,  5-yr mortality                23.8%   25.5%     -7%  * circular  
+    -> 95% CI 17.8%–35.8%
+  Prior donor, 10-yr mortality                37.2%   32.4%    +15%  * circular  
+    -> 95% CI 21.3%–47.4%
+  General pathway,  1-yr mortality            10.6%   15.6%    -32%    non-circ.
+  General pathway,  3-yr mortality            25.9%   26.1%     -1%    non-circ.
+  General pathway,  5-yr mortality            37.4%   34.9%     +7%    non-circ.
+  General pathway, 10-yr mortality            57.5%   43.0%    +34%    non-circ.
+
+  Donor inputs: preemptive 21.2%, listing 0.308/yr, dialysis mort ×0.78, post-Tx mort ×0.70
+  [B] General pathway vs Muzaale non-donors: 3- and 5-yr mortality are
+      reproduced within ~15%, but year 1 is under-predicted and year 10
+      over-predicted. Observed ESRD mortality is front-loaded (frail
+      patients die early, leaving a healthier pool); the model's
+      homogeneous cohort has no such selection. Transplant access
+      explains little of the gap: giving the general pathway Muzaale-like
+      access (21.5-month median wait, ~26% listed by 12 mo) lowers 10-yr
+      mortality only from 57% to 53%. The non-donor arm's ESRD
+      incidence is ~0.04%/15 yr, so this has negligible effect on ΔLE, but
+      it bears on the ESRD-conditional priority benefit (script 10).
+
+
+────────────────────────────────────────────────────────────────────────
+  CHECK 4 — Dialysis life expectancy  (USRDS 2023 ADR Table 6.1, 2019)
+────────────────────────────────────────────────────────────────────────
+  Age group              Model    USRDS      Δ%
+  40-44                    9.1     10.6    -15%
+  50-54                    7.3      7.9     -8%
+  60-64                    5.6      5.8     -4%
+  70-74                    4.2      4.2     +1%
+  80-84                    3.5      3.0    +13%
+
+
+────────────────────────────────────────────────────────────────────────
   SUMMARY — non-circular checks
 ────────────────────────────────────────────────────────────────────────
   [PASS]  Transplanted at 3 yr (all Tx)           model 38.3%  obs 44.3%  Δ = -14%

@@ -55,7 +55,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import (load_life_table, load_params, RESULTS, DATA_PROC,
 				   beta_params_from_mean_se, weibull_annual_prob,
 				   weibull_scale_from_cumrisk, weibull_scale_from_cumrisk_competing,
-				   mean_to_annual_tx_prob, donor_mort_hr_at)
+				   mean_to_annual_tx_prob, donor_mort_hr_at,
+				   dialysis_annual_mort, posttx_annual_mort, waitlist_annual_mort_at,
+				   graft_annual_fail, grams_nondonor_age_scale)
 
 # ── GLOBAL CONSTANTS ──────────────────────────────────────────────────────────
 N_SIM     = 5_000_000   # individuals per arm (base case)
@@ -118,6 +120,21 @@ def sample_params(rng):
 	# uncertainty (OWSA range 0.05–0.30, base 0.15).  se_frac=0.40 gives a PSA
 	# 95% CrI of roughly [0.03, 0.27], consistent with the acknowledged range.
 	p["wl_listing_prob"] = beta_sample("wl_listing_prob", 0.40)
+
+	# Prior-donor post-ESRD inputs (Muzaale 2016, n=99): small cohort, so
+	# sampled from its published uncertainty.
+	#   preemptive 21/99 → binomial SE √(p(1−p)/99) ≈ 19% of mean
+	#   listing: 43.4% (34–54) at 12 mo → SE ≈ 0.051, ≈ 23% of fitted prob
+	#   dialysis multiplier: log-normal, σ from overall mortality-after-ESRD
+	#     HR 0.7 (0.4–1.0): ln(1.0/0.4)/3.92 = 0.234
+	#   post-Tx multiplier: log-normal, σ from adjusted HR 0.7 (0.2–2.4):
+	#     ln(2.4/0.2)/3.92 = 0.634
+	p["donor_esrd_preemptive_prob"] = beta_sample("donor_esrd_preemptive_prob", 0.19)
+	p["donor_wl_listing_prob"]      = beta_sample("donor_wl_listing_prob", 0.23)
+	p["donor_dialysis_mort_mult"] = float(np.exp(rng.normal(
+		np.log(BASE["donor_dialysis_mort_mult"]), 0.234)))
+	p["donor_posttx_mort_mult"] = float(np.exp(rng.normal(
+		np.log(BASE["donor_posttx_mort_mult"]), 0.634)))
 
 	# Donor mortality HR is NOT sampled in the PSA: the disagreement across
 	# studies (Segev/Garg/Berger show no excess mortality; Mjøen shows HR=1.30
@@ -208,17 +225,14 @@ def simulate_cohort(p, n, age_at_entry, donor: bool, rng, life_table=None):
 	# Pre-compute age-independent transition probabilities
 	wl_tx_std  = waitlist_annual_tx_prob(p, priority=False)
 	wl_tx_pld  = waitlist_annual_tx_prob(p, priority=True)
-	wl_mort    = waitlist_annual_mort(p)
 	wl_remove  = p["wl_removal_rate_yr"]
-	wl_listing = p.get("wl_listing_prob", 1.0)
 	wl_state   = 3 if donor else 2
 
-	dial_mort1 = p["dialysis_1yr_mort"]   # first year on dialysis
-	dial_mort  = p["dialysis_annual_mort"]
-
-	# One-time preemptive listing probability at ESRD onset (USRDS 2025 Fig 7.13)
-	preemptive_p = float(p.get(
-		"esrd_preemptive_prob_pld" if donor else "esrd_preemptive_prob_std", 0.0))
+	# Post-ESRD listing: prior donors use Muzaale 2016 inputs (preemptive
+	# fraction, calibrated listing rate); non-donors use USRDS 2025 Ch.7.
+	wl_listing   = p["donor_wl_listing_prob"] if donor else p.get("wl_listing_prob", 1.0)
+	preemptive_p = float(p["donor_esrd_preemptive_prob"] if donor
+						 else p.get("esrd_preemptive_prob_std", 0.0))
 
 	# Track time in ESRD state for first-year mortality
 	esrd_time  = np.zeros(n)
@@ -227,8 +241,13 @@ def simulate_cohort(p, n, age_at_entry, donor: bool, rng, life_table=None):
 	for yr in range(int(MAX_AGE - age_at_entry) + 1):
 		a = int(age_at_entry) + yr
 
-		# Background mortality this cycle (all states)
-		q_bg = lt[min(a, MAX_AGE)] * bg_hr_fn(yr)
+		# Background mortality this cycle (Healthy state); post-ESRD states
+		# use age-dependent state mortality floored at the life-table qx
+		qx   = lt[min(a, MAX_AGE)]
+		q_bg = qx * bg_hr_fn(yr)
+		dial_mort1 = dialysis_annual_mort(p, a, first_year=True,  donor=donor, q_floor=qx)
+		dial_mort  = dialysis_annual_mort(p, a, first_year=False, donor=donor, q_floor=qx)
+		wl_mort    = waitlist_annual_mort_at(p, a, q_floor=qx)
 
 		u = rng.random((n, 6))  # draws for each possible event
 
@@ -294,17 +313,10 @@ def simulate_cohort(p, n, age_at_entry, donor: bool, rng, life_table=None):
 		mask4 = (state == 4) & alive
 		if mask4.any():
 			idx = np.where(mask4)[0]
-			# Age-stratified post-transplant mortality (SRTR 2023 DDKT)
-			if a < 35:   ptx_mort = p.get("posttx_annual_mort_age1834", p["posttx_annual_mort"])
-			elif a < 50: ptx_mort = p.get("posttx_annual_mort_age3549", p["posttx_annual_mort"])
-			elif a < 65: ptx_mort = p.get("posttx_annual_mort_age5064", p["posttx_annual_mort"])
-			else:        ptx_mort = p.get("posttx_annual_mort_age65p",  p["posttx_annual_mort"])
-			# Age-stratified post-year-1 graft failure (SRTR 2023 KI 53)
-			gf_base = p.get("graft_annual_fail_postyear1", 0.025)
-			if a < 35:   graft_fail_rate = p.get("graft_annual_fail_postyear1_age1834", gf_base)
-			elif a < 50: graft_fail_rate = p.get("graft_annual_fail_postyear1_age3549", gf_base)
-			elif a < 65: graft_fail_rate = p.get("graft_annual_fail_postyear1_age5064", gf_base)
-			else:        graft_fail_rate = p.get("graft_annual_fail_postyear1_age65p",  gf_base)
+			# Age-stratified post-transplant mortality (SRTR 2023 DDKT) and
+			# post-year-1 graft failure (SRTR 2023 KI 53)
+			ptx_mort        = posttx_annual_mort(p, a, donor=donor, q_floor=qx)
+			graft_fail_rate = graft_annual_fail(p, a)
 			die_ptx    = u[mask4, 0] < ptx_mort
 			graft_fail = (~die_ptx) & (u[mask4, 1] < graft_fail_rate)
 			new_state[idx[die_ptx]]    = 5
@@ -336,11 +348,9 @@ def run_arm_analytic(p, age_at_entry: int, donor: bool, life_table=None) -> floa
 	lt = life_table if life_table is not None else LIFE_TABLE_QX
 
 	wl_tx         = waitlist_annual_tx_prob(p, priority=donor)
-	wl_mort_p     = waitlist_annual_mort(p)
 	wl_remove     = float(p["wl_removal_rate_yr"])
-	wl_listing    = float(p.get("wl_listing_prob", 1.0))
-	dial_mort1    = float(p["dialysis_1yr_mort"])
-	dial_mort     = float(p["dialysis_annual_mort"])
+	wl_listing    = float(p["donor_wl_listing_prob"] if donor
+						  else p.get("wl_listing_prob", 1.0))
 	bg_hr_fn      = (lambda t: donor_mort_hr_at(
 		t,
 		p.get("donor_mort_hr_early", 1.0),
@@ -348,8 +358,8 @@ def run_arm_analytic(p, age_at_entry: int, donor: bool, life_table=None) -> floa
 		p.get("donor_mort_hr_t_start", 10.0),
 		p.get("donor_mort_hr_t_end", 15.0),
 	)) if donor else (lambda t: 1.0)
-	preemptive_p  = float(p.get(
-		"esrd_preemptive_prob_pld" if donor else "esrd_preemptive_prob_std", 0.0))
+	preemptive_p  = float(p["donor_esrd_preemptive_prob"] if donor
+						  else p.get("esrd_preemptive_prob_std", 0.0))
 
 	cum_risk_15 = float(p["esrd_15yr_donor_overall"] if donor else p["esrd_15yr_nondonor"])
 	wbl_k   = float(p["weibull_shape"])
@@ -363,19 +373,15 @@ def run_arm_analytic(p, age_at_entry: int, donor: bool, life_table=None) -> floa
 
 	while H + D1 + D2 + WL + PT > 1e-9:
 		age    = age_at_entry + yr
-		q_bg   = lt[min(age, MAX_AGE)] * bg_hr_fn(yr)
+		qx     = lt[min(age, MAX_AGE)]
+		q_bg   = min(qx * bg_hr_fn(yr), 1.0)
 		p_esrd = weibull_annual_prob(float(yr), wbl_lam, wbl_k)
 
-		if age < 35:   ptx_mort = float(p.get("posttx_annual_mort_age1834", p["posttx_annual_mort"]))
-		elif age < 50: ptx_mort = float(p.get("posttx_annual_mort_age3549", p["posttx_annual_mort"]))
-		elif age < 65: ptx_mort = float(p.get("posttx_annual_mort_age5064", p["posttx_annual_mort"]))
-		else:          ptx_mort = float(p.get("posttx_annual_mort_age65p",  p["posttx_annual_mort"]))
-
-		gf_base = p.get("graft_annual_fail_postyear1", 0.025)
-		if age < 35:   graft_fail = float(p.get("graft_annual_fail_postyear1_age1834", gf_base))
-		elif age < 50: graft_fail = float(p.get("graft_annual_fail_postyear1_age3549", gf_base))
-		elif age < 65: graft_fail = float(p.get("graft_annual_fail_postyear1_age5064", gf_base))
-		else:          graft_fail = float(p.get("graft_annual_fail_postyear1_age65p",  gf_base))
+		dial_mort1 = dialysis_annual_mort(p, age, first_year=True,  donor=donor, q_floor=qx)
+		dial_mort  = dialysis_annual_mort(p, age, first_year=False, donor=donor, q_floor=qx)
+		wl_mort_p  = waitlist_annual_mort_at(p, age, q_floor=qx)
+		ptx_mort   = posttx_annual_mort(p, age, donor=donor, q_floor=qx)
+		graft_fail = graft_annual_fail(p, age)
 
 		H_die  = H * q_bg;     H_surv = H - H_die
 		H_esrd = H_surv * p_esrd;      H_stay = H_surv - H_esrd
@@ -472,8 +478,18 @@ def run_owsa(age_at_donation=40):
 		"PLD wait 50 days (optimistic)": {"wl_pld_mean_days": 72.1},   # 50d median → mean/ln2
 		"PLD wait 200 days":             {"wl_pld_mean_days": 288.5},  # 200d median → mean/ln2
 		"No priority (PLD=standard)":    {"wl_pld_mean_days": 1765},
-		"Dialysis mort +50%":            {"dialysis_annual_mort": 0.255},
-		"Dialysis mort -50%":            {"dialysis_annual_mort": 0.085},
+		"Dialysis mort +50%":            {"dialysis_mort_scale": 1.5},
+		"Dialysis mort -50%":            {"dialysis_mort_scale": 0.5},
+		# Prior-donor post-ESRD inputs (Muzaale 2016) replaced by the general
+		# ESRD population's: isolates the effect of donor-specific inputs
+		"Donor ESRD inputs = general":   {
+			"donor_esrd_preemptive_prob": BASE["esrd_preemptive_prob_std"],
+			"donor_wl_listing_prob":      BASE["wl_listing_prob"],
+			"donor_dialysis_mort_mult":   1.0,
+			"donor_posttx_mort_mult":     1.0,
+		},
+		"Donor dialysis mult 0.4 (HR CI)": {"donor_dialysis_mort_mult": 0.4},
+		"Donor dialysis mult 1.0 (HR CI)": {"donor_dialysis_mort_mult": 1.0},
 		# Post-Tx survival: LDKT quality vs base-case DDKT (SRTR 2023 ADR Fig KI 76)
 		"Post-Tx: LDKT quality":         {
 			"posttx_annual_mort_age1834": BASE.get("posttx_ld_annual_mort_age1834", 0.0042),
@@ -578,10 +594,11 @@ def _age_adjust_esrd_nonblack(base_rate: float, age: int, reference_age: int = 4
 	return base_rate * hr ** ((age - reference_age) / 10)
 
 
-def _age_adjust_esrd_nondonor(base_rate: float, age: int, reference_age: int = 40) -> float:
-	"""Scale non-donor ESRD rate by population age-gradient (proxy: 1.40/decade)."""
-	hr = float(BASE.get("hr_age_per_decade_nondonor", 1.40))
-	return base_rate * hr ** ((age - reference_age) / 10)
+def _age_adjust_esrd_nondonor(base_rate: float, age: int, race: str = "Overall",
+							  sex: str = "Overall", reference_age: int = 40) -> float:
+	"""Scale an age-40 non-donor ESRD rate by the Grams 2016 age gradient for
+	that race and sex (see grams_nondonor_age_scale in utils.py)."""
+	return base_rate * grams_nondonor_age_scale(BASE, age, race, sex, reference_age)
 
 
 # Grams 2016 direct sex×race non-donor baselines (abstract).
@@ -608,14 +625,14 @@ def run_race_subgroups(age_at_donation=40, n=500_000):
 		"White donor": {
 			"esrd_15yr_donor_overall": 0.00227,
 			"esrd_15yr_nondonor":      0.00050,
-			"wl_mort_per_100py":       BASE.get("wl_mort_white_per_100py", 5.71),
+			"wl_mort_race_mult": BASE["wl_mort_race_mult_white"],
 			**_scale_posttx_mort(BASE, BASE.get("posttx_annual_mort_white", 0.038)),
 		},
 		"Overall (base)": {},
 		"Black donor": {
 			"esrd_15yr_donor_overall": 0.00747,
 			"esrd_15yr_nondonor":      0.00195,
-			"wl_mort_per_100py":       BASE.get("wl_mort_black_per_100py", 4.62),
+			"wl_mort_race_mult": BASE["wl_mort_race_mult_black"],
 			**_scale_posttx_mort(BASE, BASE.get("posttx_annual_mort_black", 0.035)),
 		},
 	}
@@ -942,14 +959,14 @@ def make_age_race_matrix():
 		"White": {
 			"esrd_15yr_donor_overall": 0.00227,
 			"esrd_15yr_nondonor":      0.00050,
-			"wl_mort_per_100py":       BASE.get("wl_mort_white_per_100py", 5.71),
+			"wl_mort_race_mult": BASE["wl_mort_race_mult_white"],
 			**_scale_posttx_mort(BASE, BASE.get("posttx_annual_mort_white", 0.038)),
 		},
 		"Overall": {},
 		"Black": {
 			"esrd_15yr_donor_overall": 0.00747,
 			"esrd_15yr_nondonor":      0.00195,
-			"wl_mort_per_100py":       BASE.get("wl_mort_black_per_100py", 4.62),
+			"wl_mort_race_mult": BASE["wl_mort_race_mult_black"],
 			**_scale_posttx_mort(BASE, BASE.get("posttx_annual_mort_black", 0.035)),
 		},
 	}
@@ -967,7 +984,7 @@ def make_age_race_matrix():
 				p["esrd_15yr_donor_overall"] = _age_adjust_esrd_nonblack(base_donor, age)
 			else:
 				p["esrd_15yr_donor_overall"] = base_donor
-			p["esrd_15yr_nondonor"] = _age_adjust_esrd_nondonor(base_nondonor, age)
+			p["esrd_15yr_nondonor"] = _age_adjust_esrd_nondonor(base_nondonor, age, race=race)
 			le_d  = run_arm_analytic(p, age, donor=True)
 			le_nd = run_arm_analytic(p, age, donor=False)
 			matrix[r, a] = (le_d - le_nd) * 365.25
@@ -1050,7 +1067,7 @@ def make_age_sex_matrix():
 		base_nondonor = p["esrd_15yr_nondonor"]
 		for a, age in enumerate(ages):
 			p["esrd_15yr_donor_overall"] = _age_adjust_esrd_nonblack(base_donor, age)
-			p["esrd_15yr_nondonor"]      = _age_adjust_esrd_nondonor(base_nondonor, age)
+			p["esrd_15yr_nondonor"]      = _age_adjust_esrd_nondonor(base_nondonor, age, sex=sex)
 			le_d  = run_arm_analytic(p, age, donor=True,  life_table=lt)
 			le_nd = run_arm_analytic(p, age, donor=False, life_table=lt)
 			matrix[s, a] = (le_d - le_nd) * 365.25
@@ -1105,7 +1122,7 @@ def make_sex_race_matrix():
 			"esrd_donor":    0.00227,
 			"esrd_nondonor": 0.00050,
 			"overrides": {
-				"wl_mort_per_100py": BASE.get("wl_mort_white_per_100py", 5.71),
+				"wl_mort_race_mult": BASE["wl_mort_race_mult_white"],
 				**_scale_posttx_mort(BASE, BASE.get("posttx_annual_mort_white", 0.038)),
 			},
 		},
@@ -1118,7 +1135,7 @@ def make_sex_race_matrix():
 			"esrd_donor":    0.00747,
 			"esrd_nondonor": 0.00195,
 			"overrides": {
-				"wl_mort_per_100py": BASE.get("wl_mort_black_per_100py", 4.62),
+				"wl_mort_race_mult": BASE["wl_mort_race_mult_black"],
 				**_scale_posttx_mort(BASE, BASE.get("posttx_annual_mort_black", 0.035)),
 			},
 		},
@@ -1204,14 +1221,14 @@ def make_age_race_sex_matrix():
 		"White": {
 			"esrd_15yr_donor_overall": 0.00227,
 			"esrd_15yr_nondonor":      0.00050,
-			"wl_mort_per_100py":       BASE.get("wl_mort_white_per_100py", 5.71),
+			"wl_mort_race_mult": BASE["wl_mort_race_mult_white"],
 			**_scale_posttx_mort(BASE, BASE.get("posttx_annual_mort_white", 0.038)),
 		},
 		"Overall": {},
 		"Black": {
 			"esrd_15yr_donor_overall": 0.00747,
 			"esrd_15yr_nondonor":      0.00195,
-			"wl_mort_per_100py":       BASE.get("wl_mort_black_per_100py", 4.62),
+			"wl_mort_race_mult": BASE["wl_mort_race_mult_black"],
 			**_scale_posttx_mort(BASE, BASE.get("posttx_annual_mort_black", 0.035)),
 		},
 	}
@@ -1244,7 +1261,8 @@ def make_age_race_sex_matrix():
 					p["esrd_15yr_donor_overall"] = base_donor
 				# Grams 2016 reference-age (40) non-donor baseline, then age-adjusted
 				nondonor_ref = _GRAMS_NONDONOR.get((race, sex), base_nondonor)
-				p["esrd_15yr_nondonor"] = _age_adjust_esrd_nondonor(nondonor_ref, age)
+				p["esrd_15yr_nondonor"] = _age_adjust_esrd_nondonor(nondonor_ref, age,
+																	race=race, sex=sex)
 				le_d  = run_arm_analytic(p, age, donor=True,  life_table=lt)
 				le_nd = run_arm_analytic(p, age, donor=False, life_table=lt)
 				mat[r, a] = (le_d - le_nd) * 365.25
@@ -1353,7 +1371,7 @@ def make_results_table(base_res, psa_diffs, owsa_res, age_res, race_res, sex_res
 
 	for lbl in ["No priority (PLD=standard)",
 				"ESRD RR ×11 (Mjøen upper)", "PLD wait 50 days (optimistic)",
-				"Post-Tx: LDKT quality"]:
+				"Post-Tx: LDKT quality", "Donor ESRD inputs = general"]:
 		rows.append({
 			"Analysis": f"Sensitivity: {lbl}",
 			"LE Donor (yr)": "—",

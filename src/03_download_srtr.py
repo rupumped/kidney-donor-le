@@ -14,7 +14,7 @@ Transplant cohort for survival figures: 2016–2018 recipients.
 Key figures used (Kidney chapter):
   Figure KI 22  — 3-year waitlist outcomes (2018–2020 listing cohort)
   Figure KI 24  — pretransplant mortality rate overall by year
-  Figure KI 25  — pretransplant mortality rate by age
+  Figure KI 25  — pretransplant mortality rate by age (2019 used in model)
   Figure KI 26  — pretransplant mortality rate by race
   Figure KI 30  — pretransplant mortality rate by DSA (2023)
   Figure KI 53  — DDKT graft survival by recipient age (KM, 2016–2018 cohort)
@@ -65,6 +65,16 @@ SRTR_FALLBACK = {
     "pretx_mort_per_100py_black":    4.62,
     "pretx_mort_per_100py_white":    5.71,
     "pretx_mort_per_100py_hispanic": 4.59,
+    # 2019 (pre-COVID) values from Figures KI 24/25/26, matching the USRDS
+    # dialysis mortality year used in the model
+    "pretx_mort_per_100py_overall_2019": 4.78,
+    "pretx_mort_per_100py_age1834_2019": 1.98,
+    "pretx_mort_per_100py_age3549_2019": 2.95,
+    "pretx_mort_per_100py_age5064_2019": 4.97,
+    "pretx_mort_per_100py_age65p_2019":  7.43,
+    "pretx_mort_per_100py_black_2019":    4.47,
+    "pretx_mort_per_100py_white_2019":    5.57,
+    "pretx_mort_per_100py_hispanic_2019": 4.20,
 
     # ── WAITLIST 3-YEAR OUTCOMES (FIGURE KI 22, 2018–2020 LISTING COHORT) ─
     "wl_3yr_still_waiting":  0.299,
@@ -245,22 +255,29 @@ def km_to_rows(xl, sheet, donor_type, timepoints=(1, 3, 5)):
     return rows
 
 
-def parse_time_series_last(xl, sheet, col_name):
-    """Return the last (most recent) value in a year × metric time-series sheet."""
+def parse_time_series_last(xl, sheet, col_name, year=None):
+    """Return one row of a year × metric time-series sheet: the given year,
+    or the last (most recent) year if year is None."""
     df = xl.parse(sheet, header=None)
-    # Header row has 'Year' in column 0
-    hdr_row = None
+    # Header row has 'Year' in some column (column 8 in the 2023 ADR export,
+    # after the caption columns); the data block starts there.
+    hdr_row = year_col = None
     for i, row in df.iterrows():
-        if str(row.iloc[0]).strip() == "Year":
-            hdr_row = i
+        hits = [j for j, v in enumerate(row) if str(v).strip() == "Year"]
+        if hits:
+            hdr_row, year_col = i, hits[0]
             break
     if hdr_row is None:
         return {}
     cols = df.iloc[hdr_row].tolist()
     data = df.iloc[hdr_row + 1:].copy()
-    data.iloc[:, 0] = pd.to_numeric(data.iloc[:, 0], errors="coerce")
-    data = data.dropna(subset=[data.columns[0]]).sort_values(data.columns[0])
-    last_row = data.iloc[-1]
+    data.iloc[:, year_col] = pd.to_numeric(data.iloc[:, year_col], errors="coerce")
+    data = data.dropna(subset=[data.columns[year_col]]).sort_values(data.columns[year_col])
+    if year is not None:
+        data = data[data.iloc[:, year_col] == year]
+        if data.empty:
+            return {}
+    row = data.iloc[-1]
     result = {}
     for ci, col in enumerate(cols):
         label = str(col)
@@ -268,7 +285,7 @@ def parse_time_series_last(xl, sheet, col_name):
             continue
         if col_name and label != col_name:
             continue
-        v = pd.to_numeric(last_row.iloc[ci], errors="coerce")
+        v = pd.to_numeric(row.iloc[ci], errors="coerce")
         if not pd.isna(v):
             result[label] = round(v, 4)
     return result
@@ -314,6 +331,19 @@ def main():
         for col, key in race_map.items():
             if col in mort_race:
                 params[key] = round(mort_race[col], 2)
+
+        # 2019 (pre-COVID) values, matching the USRDS dialysis mortality year
+        m19 = parse_time_series_last(xl, "KI-F24-mort-adult-waiting-all", "overall", 2019)
+        if m19:
+            params["pretx_mort_per_100py_overall_2019"] = round(m19["overall"], 2)
+        a19 = parse_time_series_last(xl, "KI-F25-mort-adult-waiting-age", None, 2019)
+        for col, key in age_map.items():
+            if col in a19:
+                params[f"{key}_2019"] = round(a19[col], 2)
+        r19 = parse_time_series_last(xl, "KI-F26-mort-adult-waiting-race", None, 2019)
+        for col, key in race_map.items():
+            if col in r19:
+                params[f"{key}_2019"] = round(r19[col], 2)
 
         # ── 3-year waitlist outcomes ──────────────────────────────────────
         wl3 = km_at_year(xl, "KI-F22-3yr-outcomes-adult-waiti", 3)
