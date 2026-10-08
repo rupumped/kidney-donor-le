@@ -89,10 +89,12 @@ SRTR_FALLBACK = {
     "wl_annual_removal_competing": 0.1260,
 
     # ── MEAN WAIT TIMES ───────────────────────────────────────────────────
-    # National mean waiting time at transplant, Punjala 2024 (Transplant Proc
-    # 56:1740-1751), Table 3: post-KAS250 (5/2021-4/2022) 58 months = 1765 d;
-    # pre-KAS250 (8/2018-7/2019) 61 months = 1857 d.
-    "wl_std_mean_days": 1765,
+    # Standard wait derived from SRTR 2023 ADR Figure KI-22 (2018-2020 listing
+    # cohort, 3-year outcomes) via competing exponential model:
+    #   Σλ = -ln(P_still)/3;  λ_T = (P_tx/P_exit) × Σλ;  mean = 365.25/λ_T
+    # Punjala 2024 (Transplant Proc 56:1740-1751) Table 3 mean of 58 months
+    # (1,765 d post-KAS250) is retained for reference and as the OWSA upper bound.
+    "wl_std_mean_days_punjala_2024": 1765,
     "wl_std_mean_days_prekas250": 1857,
     # Prior living donors (PLD) — Wainright 2017 AJT, UNOS abstract 2015
     "wl_pld_median_days_overall": 100,
@@ -149,6 +151,31 @@ SRTR_FALLBACK = {
     # (SRTR data 1995–2017, 2014-era cohort half-life 11.7 yr for DDKT)
     "ddkt_median_graft_surv_yr_2014era": 11.7,
 }
+
+def _srtr_std_wait_from_ki22(d: dict) -> int:
+    """
+    Derive mean standard wait (days) from SRTR Figure KI-22 competing-risk data.
+
+    Fits a competing exponential model to the 3-year waitlist outcomes:
+      Σλ = -ln(P_still) / 3          (total exit rate)
+      λ_T = (P_tx / P_exit) × Σλ    (transplant-specific rate, DDKT+LDKT)
+      mean_wait = 365.25 / λ_T
+
+    This λ_T is then used directly via mean_to_annual_tx_prob(mean_wait),
+    which treats mean_wait as the mean of an exponential with rate 1/mean — i.e.
+    1 - exp(-λ_T), the correct annual transplant probability from the same model.
+    """
+    import math
+    p_still = d["wl_3yr_still_waiting"]
+    p_tx    = d["wl_3yr_ddkt"] + d["wl_3yr_ldkt"]
+    p_exit  = 1.0 - p_still
+    sum_lam = -math.log(p_still) / 3.0
+    lam_tx  = (p_tx / p_exit) * sum_lam
+    return round(365.25 / lam_tx)
+
+
+# Compute the KI-22-calibrated standard wait and add it to SRTR_FALLBACK.
+SRTR_FALLBACK["wl_std_mean_days"] = _srtr_std_wait_from_ki22(SRTR_FALLBACK)
 
 # Age-stratified post-year-1 annual graft failure, derived as
 # 1 - (5yr_survival / 1yr_survival)^(1/4) from the Figure KI 53 values above.
@@ -357,12 +384,15 @@ def main():
         for col, key in outcome_map.items():
             if col in wl3:
                 params[key] = round(wl3[col] / 100, 4)
+        # Recompute standard wait from updated KI-22 outcomes.
+        if all(k in params for k in ("wl_3yr_still_waiting", "wl_3yr_ddkt", "wl_3yr_ldkt")):
+            params["wl_std_mean_days"] = _srtr_std_wait_from_ki22(params)
         if "wl_3yr_removed_other" in params:
             import math
             wl_mort_a = 1.0 - math.exp(
                 -params.get("pretx_mort_per_100py_overall_2023", 5.0) / 100)
             wl_tx_a   = float(mean_to_annual_tx_prob(
-                float(params.get("wl_std_mean_days", 1765))))
+                float(params.get("wl_std_mean_days", 1434))))
             params["wl_annual_removal_competing"] = _solve_removal_rate(
                 params["wl_3yr_removed_other"], wl_tx_a, wl_mort_a)
 
@@ -497,7 +527,8 @@ def main():
     p = params
     print("\n  Key values written to srtr_params.json:")
     print(f"    Pretx mortality (2023):          {p['pretx_mort_per_100py_overall_2023']:.1f}/100 PY")
-    print(f"    Std wait mean (post-KAS250):     {p['wl_std_mean_days']} days")
+    print(f"    Std wait (SRTR KI-22 calibrated):{p['wl_std_mean_days']} days")
+    print(f"    Std wait (Punjala 2024 ref):     {p.get('wl_std_mean_days_punjala_2024', 1765)} days")
     print(f"    PLD wait mean (overall):         {p.get('wl_pld_mean_days_overall', 144)} days")
     print(f"    DDKT 5-yr graft surv (18–34):    {p['ddkt_graft_5yr_age1834']:.1%}")
     print(f"    DDKT 5-yr graft surv (35–49):    {p['ddkt_graft_5yr_age3549']:.1%}")

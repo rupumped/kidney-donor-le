@@ -19,8 +19,9 @@ Model design:
 
 Both arms carry baseline (non-donor) ESRD risk and background mortality HR = 1.0.
 The sole difference between arms is waitlist priority upon ESRD onset.
-Post-transplant outcomes use DDKT survival (base case) since the UNOS PLD
-priority is for deceased-donor allocation; LDKT outcomes tested in sensitivity.
+Post-transplant outcomes use LDKT survival for the voucher (priority) arm,
+since NKR vouchers grant access to a living-donor kidney via the exchange
+network; DDKT outcomes used for the control arm and tested as a sensitivity.
 
 Non-Markovian dialysis mortality is handled by state-splitting (same approach
 as 07_cohort_markov.py):
@@ -104,7 +105,7 @@ def run_arm(p: dict, n: float, age_at_entry: int, voucher: bool,
         Age at cohort entry (years).
     voucher : bool
         True  → priority waitlist (~100-day median) upon ESRD onset.
-        False → standard waitlist (~1,765-day median) upon ESRD onset.
+        False → standard waitlist (~1,434-day SRTR mean) upon ESRD onset.
     esrd_cum_risk_15 : float, optional
         15-year competing-risk ESRD CIF at age_at_entry. Defaults to the
         non-donor overall (age-40) rate scaled by the Grams 2016 age gradient.
@@ -341,7 +342,7 @@ def make_fig_age_sweep(age_results):
     ax.set_ylabel("LE benefit of voucher (days)", fontsize=10)
     ax.set_title(
         "Voucher life-expectancy benefit by age\n"
-        "(non-donor ESRD risk, DDKT outcomes, base-case parameters)",
+        "(non-donor ESRD risk, LDKT outcomes for voucher arm, base-case parameters)",
         fontsize=11, fontweight="bold", color="#2C2C2A"
     )
     ax.spines[["top", "right"]].set_visible(False)
@@ -364,8 +365,8 @@ def main(age_at_entry: int = 40, n: int = N_PER_ARM):
     p = BASE.copy()
 
     # ── BASE CASE ─────────────────────────────────────────────────────────────
-    le_v,  trace_v = run_arm(p, n, age_at_entry, voucher=True)
-    le_c,  trace_c = run_arm(p, n, age_at_entry, voucher=False)
+    le_v,  trace_v = run_arm(p, n, age_at_entry, voucher=True,  ldkt=True)
+    le_c,  trace_c = run_arm(p, n, age_at_entry, voucher=False, ldkt=False)
     diff = le_v - le_c
 
     print("BASE CASE RESULTS")
@@ -382,8 +383,8 @@ def main(age_at_entry: int = 40, n: int = N_PER_ARM):
     print("-" * 40)
     age_results = []
     for age in [25, 30, 35, 40, 45, 50, 55, 60]:
-        le_a, _ = run_arm(p, n, age, voucher=True)
-        le_b, _ = run_arm(p, n, age, voucher=False)
+        le_a, _ = run_arm(p, n, age, voucher=True,  ldkt=True)
+        le_b, _ = run_arm(p, n, age, voucher=False, ldkt=False)
         d_days = (le_a - le_b) * 365.25
         age_results.append({"age": age, "diff_days": d_days,
                             "le_voucher": le_a, "le_control": le_b})
@@ -404,8 +405,8 @@ def main(age_at_entry: int = 40, n: int = N_PER_ARM):
                                  * grams_nondonor_age_scale(p, age_at_entry, "White")),
     ]
     for label, risk in subgroups:
-        le_a, _ = run_arm(p, n, age_at_entry, voucher=True,  esrd_cum_risk_15=risk)
-        le_b, _ = run_arm(p, n, age_at_entry, voucher=False, esrd_cum_risk_15=risk)
+        le_a, _ = run_arm(p, n, age_at_entry, voucher=True,  esrd_cum_risk_15=risk, ldkt=True)
+        le_b, _ = run_arm(p, n, age_at_entry, voucher=False, esrd_cum_risk_15=risk, ldkt=False)
         d_days = (le_a - le_b) * 365.25
         print(f"  {label:<25s}  15-yr CIF={risk*100:.3f}%  ΔLE={d_days:+.2f} days")
     print()
@@ -414,57 +415,51 @@ def main(age_at_entry: int = 40, n: int = N_PER_ARM):
     print("ONE-WAY SENSITIVITY ANALYSIS")
     print("-" * 40)
 
-    # Pessimistic DDKT baseline: post-Tx mortality rates ×1.25.
-    # Used as the "low" end of the Post-Tx quality row so both ends of that
-    # bar deviate from the base case (avoiding a one-sided bar).
-    ptx_pessimistic = {
-        k: p[k] * 1.25
-        for k in ("posttx_annual_mort_age1834", "posttx_annual_mort_age3549",
-                  "posttx_annual_mort_age5064", "posttx_annual_mort_age65p",
-                  "posttx_annual_mort")
-    }
-
-    # Each entry: (label, lo_overrides, hi_overrides, ldkt_lo, ldkt_hi)
+    # Each entry: (label, lo_overrides, hi_overrides,
+    #              ldkt_voucher_lo, ldkt_control_lo, ldkt_voucher_hi, ldkt_control_hi)
+    # Base case: voucher arm = LDKT, control arm = DDKT.
+    # All parameter rows hold this split; the Post-Tx quality row varies both arms.
     owsa_scenarios = [
         (
             "Voucher wait time (days)",
             {"wl_pld_mean_days": 288.5}, {"wl_pld_mean_days": 72.1},  # 200d/50d median → mean
-            False, False,
+            True, False, True, False,
         ),
         (
             "Standard wait time (days)",
-            # Range = post-KAS250 SWT/LWT center means (Punjala 2024 Table 4)
-            {"wl_std_mean_days": 1491.0}, {"wl_std_mean_days": 2100.0},
-            False, False,
+            # Range: 1,200 d (optimistic lower bound) – 1,765 d (Punjala 2024 mean)
+            {"wl_std_mean_days": 1200.0}, {"wl_std_mean_days": 1765.0},
+            True, False, True, False,
         ),
         (
             "Per-cycle listing prob (from dialysis)",
             {"wl_listing_prob": p.get("wl_listing_prob_sens_low", 0.05)},
             {"wl_listing_prob": p.get("wl_listing_prob_sens_high", 0.30)},
-            False, False,
+            True, False, True, False,
         ),
         (
             "Preemptive listing prob (voucher)",
             {"esrd_preemptive_prob_pld": p["esrd_preemptive_prob_std"]},
             {"esrd_preemptive_prob_pld": 0.15},
-            False, False,
+            True, False, True, False,
         ),
         (
-            "Post-Tx mortality (DDKT ×1.25 → LDKT)",
-            ptx_pessimistic, {},   # low = pessimistic DDKT, high = LDKT
-            False, True,
+            "Post-Tx mortality (both DDKT vs both LDKT)",
+            {}, {},   # lo = both DDKT; hi = both LDKT
+            False, False, True, True,
         ),
     ]
 
     owsa_results = []
-    for label, lo_overrides, hi_overrides, ldkt_lo, ldkt_hi in owsa_scenarios:
+    for label, lo_overrides, hi_overrides, ldkt_v_lo, ldkt_c_lo, ldkt_v_hi, ldkt_c_hi \
+            in owsa_scenarios:
         p_lo = {**p, **lo_overrides}
-        le_v_lo, _ = run_arm(p_lo, n, age_at_entry, voucher=True,  ldkt=ldkt_lo)
-        le_c_lo, _ = run_arm(p_lo, n, age_at_entry, voucher=False, ldkt=ldkt_lo)
+        le_v_lo, _ = run_arm(p_lo, n, age_at_entry, voucher=True,  ldkt=ldkt_v_lo)
+        le_c_lo, _ = run_arm(p_lo, n, age_at_entry, voucher=False, ldkt=ldkt_c_lo)
 
         p_hi = {**p, **hi_overrides}
-        le_v_hi, _ = run_arm(p_hi, n, age_at_entry, voucher=True,  ldkt=ldkt_hi)
-        le_c_hi, _ = run_arm(p_hi, n, age_at_entry, voucher=False, ldkt=ldkt_hi)
+        le_v_hi, _ = run_arm(p_hi, n, age_at_entry, voucher=True,  ldkt=ldkt_v_hi)
+        le_c_hi, _ = run_arm(p_hi, n, age_at_entry, voucher=False, ldkt=ldkt_c_hi)
 
         low_days  = (le_v_lo - le_c_lo) * 365.25
         high_days = (le_v_hi - le_c_hi) * 365.25

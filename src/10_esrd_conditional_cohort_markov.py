@@ -16,7 +16,7 @@ conditions entirely on ESRD onset, answering:
 
 Arms:
   Priority  — priority waitlist (≈100-day median, voucher / prior-donor benefit)
-  Standard  — standard waitlist (≈1,765-day median)
+  Standard  — standard waitlist (≈1,434-day SRTR mean)
 
 Entry state:
   All n individuals enter with newly diagnosed ESRD.
@@ -101,7 +101,7 @@ def run_arm(p: dict, n: float, age_at_esrd: int, priority: bool,
         Age at ESRD onset / cohort entry.
     priority : bool
         True  → priority waitlist (~100-day median).
-        False → standard waitlist (~1,765-day median).
+        False → standard waitlist (~1,434-day SRTR mean).
     dial_mort_scale : float
         Multiplicative scale on both dialysis mortality rates (sensitivity).
     ldkt : bool
@@ -336,8 +336,8 @@ def main(age_at_esrd: int = 60, n: int = N_PER_ARM):
     p = BASE.copy()
 
     # ── BASE CASE ─────────────────────────────────────────────────────────────
-    le_p, trace_p, tx_p = run_arm(p, n, age_at_esrd, priority=True)
-    le_s, trace_s, tx_s = run_arm(p, n, age_at_esrd, priority=False)
+    le_p, trace_p, tx_p = run_arm(p, n, age_at_esrd, priority=True,  ldkt=True)
+    le_s, trace_s, tx_s = run_arm(p, n, age_at_esrd, priority=False, ldkt=False)
     diff = le_p - le_s
 
     print("BASE CASE RESULTS")
@@ -355,8 +355,8 @@ def main(age_at_esrd: int = 60, n: int = N_PER_ARM):
     print("-" * 45)
     age_results = []
     for age in [40, 45, 50, 55, 60, 65, 70, 75]:
-        le_a, _, tx_a = run_arm(p, n, age, priority=True)
-        le_b, _, tx_b = run_arm(p, n, age, priority=False)
+        le_a, _, tx_a = run_arm(p, n, age, priority=True,  ldkt=True)
+        le_b, _, tx_b = run_arm(p, n, age, priority=False, ldkt=False)
         d_days = (le_a - le_b) * 365.25
         age_results.append({"age": age, "diff_days": d_days,
                             "le_priority": le_a, "le_standard": le_b,
@@ -369,56 +369,62 @@ def main(age_at_esrd: int = 60, n: int = N_PER_ARM):
     print("ONE-WAY SENSITIVITY ANALYSIS")
     print("-" * 45)
 
-    owsa_scenarios: list[tuple[str, dict, dict, bool, bool, float, float]] = [
-        # (label, lo_overrides, hi_overrides, ldkt_lo, ldkt_hi, dial_scale_lo, dial_scale_hi)
+    owsa_scenarios: list[tuple[str, dict, dict, bool, bool, bool, bool, float, float]] = [
+        # (label, lo_overrides, hi_overrides,
+        #  ldkt_priority_lo, ldkt_standard_lo, ldkt_priority_hi, ldkt_standard_hi,
+        #  dial_scale_lo, dial_scale_hi)
+        # Base case: priority arm = LDKT, standard arm = DDKT.
+        # All parameter rows hold this split; Post-Tx quality row varies both arms.
         (
             "Priority wait time (days)",
             {"wl_pld_mean_days": 288.5}, {"wl_pld_mean_days": 72.1},  # 200d/50d median → mean
-            False, False, 1.0, 1.0,
+            True, False, True, False, 1.0, 1.0,
         ),
         (
             "Standard wait time (days)",
-            # Range = post-KAS250 SWT/LWT center means (Punjala 2024 Table 4)
-            {"wl_std_mean_days": 1491.0}, {"wl_std_mean_days": 2100.0},
-            False, False, 1.0, 1.0,
+            # Range: 1,200 d (optimistic lower bound) – 1,765 d (Punjala 2024 mean)
+            {"wl_std_mean_days": 1200.0}, {"wl_std_mean_days": 1765.0},
+            True, False, True, False, 1.0, 1.0,
         ),
         (
             "Per-cycle listing prob (from dialysis)",
             {"wl_listing_prob": p.get("wl_listing_prob_sens_low", 0.05)},
             {"wl_listing_prob": p.get("wl_listing_prob_sens_high", 0.30)},
-            False, False, 1.0, 1.0,
+            True, False, True, False, 1.0, 1.0,
         ),
         (
             "Preemptive listing (priority arm)",
             {"esrd_preemptive_prob_pld": p["esrd_preemptive_prob_std"]},  # conservative
             {"esrd_preemptive_prob_pld": 0.15},                            # optimistic
-            False, False, 1.0, 1.0,
+            True, False, True, False, 1.0, 1.0,
         ),
         (
-            "Post-Tx quality (DDKT vs LDKT)",
+            "Post-Tx quality (both DDKT vs both LDKT)",
             {}, {},
-            False, True, 1.0, 1.0,   # ldkt_lo=False (DDKT base), ldkt_hi=True (LDKT)
+            False, False, True, True, 1.0, 1.0,  # lo: both DDKT; hi: both LDKT
         ),
         (
             "Dialysis mortality (±20 %)",
             {}, {},
-            False, False, 1.20, 0.80,  # lo = +20% (worse), hi = −20% (better)
+            True, False, True, False, 1.20, 0.80,
         ),
     ]
 
     owsa_results = []
-    for label, lo_ov, hi_ov, ldkt_lo, ldkt_hi, dscale_lo, dscale_hi in owsa_scenarios:
+    for label, lo_ov, hi_ov, \
+            ldkt_p_lo, ldkt_s_lo, ldkt_p_hi, ldkt_s_hi, \
+            dscale_lo, dscale_hi in owsa_scenarios:
         p_lo = {**p, **lo_ov}
         le_p_lo, _, _ = run_arm(p_lo, n, age_at_esrd, priority=True,
-                                 dial_mort_scale=dscale_lo, ldkt=ldkt_lo)
+                                 dial_mort_scale=dscale_lo, ldkt=ldkt_p_lo)
         le_s_lo, _, _ = run_arm(p_lo, n, age_at_esrd, priority=False,
-                                 dial_mort_scale=dscale_lo, ldkt=ldkt_lo)
+                                 dial_mort_scale=dscale_lo, ldkt=ldkt_s_lo)
 
         p_hi = {**p, **hi_ov}
         le_p_hi, _, _ = run_arm(p_hi, n, age_at_esrd, priority=True,
-                                 dial_mort_scale=dscale_hi, ldkt=ldkt_hi)
+                                 dial_mort_scale=dscale_hi, ldkt=ldkt_p_hi)
         le_s_hi, _, _ = run_arm(p_hi, n, age_at_esrd, priority=False,
-                                 dial_mort_scale=dscale_hi, ldkt=ldkt_hi)
+                                 dial_mort_scale=dscale_hi, ldkt=ldkt_s_hi)
 
         low_days  = (le_p_lo - le_s_lo) * 365.25
         high_days = (le_p_hi - le_s_hi) * 365.25

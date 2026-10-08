@@ -477,7 +477,7 @@ def run_owsa(age_at_donation=40):
 		"Std wait 61 months (pre-KAS)":  {"wl_std_mean_days": 1857},
 		"PLD wait 50 days (optimistic)": {"wl_pld_mean_days": 72.1},   # 50d median → mean/ln2
 		"PLD wait 200 days":             {"wl_pld_mean_days": 288.5},  # 200d median → mean/ln2
-		"No priority (PLD=standard)":    {"wl_pld_mean_days": 1765},
+		"No priority (PLD=standard)":    {"wl_pld_mean_days": BASE["wl_std_mean_days"]},
 		"Dialysis mort +50%":            {"dialysis_mort_scale": 1.5},
 		"Dialysis mort -50%":            {"dialysis_mort_scale": 0.5},
 		# Prior-donor post-ESRD inputs (Muzaale 2016) replaced by the general
