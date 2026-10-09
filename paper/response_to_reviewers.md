@@ -1,6 +1,6 @@
 # Response to Comments
 
-Thank you for your careful reading. Your comments identified important weakness in the model's treatment of outcomes after ESRD. Changes in the revised manuscript appear in red. Below I reproduce each comment, summarize the revisions, and respond in turn.
+Thank you for your careful reading. Your comments identified important weaknesses in the model's treatment of outcomes after ESRD. Changes in the revised manuscript appear in red. Below I reproduce each comment, summarize the revisions, and respond in turn.
 
 ---
 
@@ -33,7 +33,7 @@ I have reframed the contribution as translation, not new estimation: The Introdu
 I agree on every point and have revised the model accordingly:
 1. **Donor-specific inputs after ESRD.** The donor arm now uses inputs from Muzaale et al. (2016), *Transplantation* 100:1306, which followed 99 US living donors who developed ESRD. Two inputs are taken directly from the study, and two are calibrated to its observed listing and mortality.
 2. **Age-stratified dialysis mortality.** I replaced the flat 22% (first year) and 17% (later years) rates with USRDS age-specific rates, which are much lower at donor ages (6.8%/year at ages 18–44).
-3. **Age-stratified waitlist mortality.** I replaced the all-ages SRTR rate has with SRTR's age-specific rates.
+3. **Age-stratified waitlist mortality.** I replaced the all-ages SRTR rate with SRTR's age-specific rates.
 
 The headline result is largely unchanged: about 890 days (2.4 years) versus 912 days (2.5 years). It remains dominated by the donor all-cause mortality hazard ratio. However, the cost that runs through ESRD fell by about a fifth, the racial disparity narrowed considerably, and the conditional value of priority access changed.
 

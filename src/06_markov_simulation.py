@@ -472,7 +472,7 @@ def run_owsa(age_at_donation=40):
 	scenarios = {
 		"ESRD RR ×2 vs controls":        {"esrd_15yr_donor_overall": 0.00039 * 2},
 		"ESRD RR ×4 vs controls":        {"esrd_15yr_donor_overall": 0.00039 * 4},
-		"ESRD RR ×11 (Mjøen upper)":     {"esrd_15yr_donor_overall": 0.00039 * 11},
+		"ESRD RR ×11 (Mjøen point est.)": {"esrd_15yr_donor_overall": 0.00039 * 11},
 		"Std wait 24 months":            {"wl_std_mean_days": 730},
 		"Std wait 61 months (pre-KAS)":  {"wl_std_mean_days": 1857},
 		"PLD wait 50 days (optimistic)": {"wl_pld_mean_days": 72.1},   # 50d median → mean/ln2
@@ -1370,7 +1370,7 @@ def make_results_table(base_res, psa_diffs, owsa_res, age_res, race_res, sex_res
 			})
 
 	for lbl in ["No priority (PLD=standard)",
-				"ESRD RR ×11 (Mjøen upper)", "PLD wait 50 days (optimistic)",
+				"ESRD RR ×11 (Mjøen point est.)", "PLD wait 50 days (optimistic)",
 				"Post-Tx: LDKT quality", "Donor ESRD inputs = general"]:
 		rows.append({
 			"Analysis": f"Sensitivity: {lbl}",

@@ -1,23 +1,23 @@
 Analysis,LE Donor (yr),LE Non-donor (yr),ΔLE (days),Note
-"Base case (age 40, overall)",35.69,38.13,-889.5,n=5M/arm
-PSA (probabilistic),—,—,"-896.4 [-941.2, -862.1]",P(beneficial)=0%
-Age at donation: 25,48.77,51.76,-1092.3,
-Age at donation: 35,39.97,42.61,-966.5,
-Age at donation: 40,35.69,38.13,-891.1,
-Age at donation: 45,31.53,33.73,-803.4,
-Age at donation: 55,23.68,25.30,-592.3,
-Race: White donor,35.72,38.12,-877.0,age 40
-Race: Overall (base),35.68,38.13,-891.1,age 40
-Race: Black donor,35.54,37.98,-895.1,age 40
-Sex: Female donor,38.13,40.45,-872.2,age 40
-Sex: Overall (base),35.71,38.15,-891.1,age 40
-Sex: Male donor,33.63,36.06,-891.2,age 40
-HR scenario: HR=1.00 flat (no excess mortality),—,—,-54.8,structural
-HR scenario: HR 1.00→1.30 by yr 10–15 (base case),—,—,-891.1,structural
-HR scenario: HR=1.30 flat (Mjøen 2014 point estimate),—,—,-1066.3,structural
-HR scenario: HR=1.52 flat (Mjøen 2014 upper 95% CI),—,—,-1674.0,structural
-Sensitivity: No priority (PLD=standard),—,—,-897.3,OWSA
-Sensitivity: ESRD RR ×11 (Mjøen upper),—,—,-908.1,OWSA
-Sensitivity: PLD wait 50 days (optimistic),—,—,-890.8,OWSA
-Sensitivity: Post-Tx: LDKT quality,—,—,-883.4,OWSA
-Sensitivity: Donor ESRD inputs = general,—,—,-925.9,OWSA
+"Base case (age 40, overall)",35.69,38.13,-889.8,n=5M/arm
+PSA (probabilistic),—,—,"-896.7 [-941.4, -863.0]",P(beneficial)=0%
+Age at donation: 25,48.77,51.77,-1092.6,
+Age at donation: 35,39.97,42.62,-966.8,
+Age at donation: 40,35.69,38.13,-891.3,
+Age at donation: 45,31.53,33.73,-803.6,
+Age at donation: 55,23.68,25.30,-592.4,
+Race: White donor,35.72,38.12,-877.3,age 40
+Race: Overall (base),35.68,38.13,-891.3,age 40
+Race: Black donor,35.54,37.99,-896.5,age 40
+Sex: Female donor,38.13,40.45,-872.5,age 40
+Sex: Overall (base),35.71,38.15,-891.3,age 40
+Sex: Male donor,33.63,36.06,-891.6,age 40
+HR scenario: HR=1.00 flat (no excess mortality),—,—,-55.0,structural
+HR scenario: HR 1.00→1.30 by yr 10–15 (base case),—,—,-891.3,structural
+HR scenario: HR=1.30 flat (Mjøen 2014 point estimate),—,—,-1066.5,structural
+HR scenario: HR=1.52 flat (Mjøen 2014 upper 95% CI),—,—,-1674.2,structural
+Sensitivity: No priority (PLD=standard),—,—,-897.5,OWSA
+Sensitivity: ESRD RR ×11 (Mjøen point est.),—,—,-908.4,OWSA
+Sensitivity: PLD wait 50 days (optimistic),—,—,-891.1,OWSA
+Sensitivity: Post-Tx: LDKT quality,—,—,-883.7,OWSA
+Sensitivity: Donor ESRD inputs = general,—,—,-924.0,OWSA

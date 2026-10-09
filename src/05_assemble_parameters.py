@@ -326,10 +326,9 @@ def main():
         "published cumulative-incidence curves (median, IQR, 1st/99th pct), not assumed "
         "(see massie_weibull_fit in utils.py)",
         "Post-tx mortality age-stratified from SRTR 2023 DDKT 5-yr patient survival",
-        "wl_listing_prob=0.15: back-calculated from USRDS 2025 Fig 7.15 3-yr CIF=12% "
-        "(general ESRD p≈0.065/yr), scaled for donor-like 18-44 cohort via Figs 7.13+7.17 "
-        "(post-dialysis yr1 listing ≈9.2%, conditional p≈0.17/yr); conservative base 0.15; "
-        "sensitivity 0.05-0.30. Replaces prior placeholder 0.75.",
+        "wl_listing_prob≈0.173: conditional post-dialysis listing rate for donor-like "
+        "(age 18-44) cohort = (wl_or_tx_1yr_18-44 - preemptive_18-44) / P(survive yr1) "
+        "= (0.25 - 0.094) / 0.90; sensitivity 0.05-0.30.",
         "Dialysis mortality age-stratified (USRDS 2023 Fig 6.5b, 2019 pre-COVID) instead of "
         "all-ages 22%/17%; all post-ESRD state mortality floored at life-table qx.",
         "Waitlist mortality by age from SRTR KI 25 (2019), race ratio from KI 26; all "

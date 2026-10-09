@@ -37,7 +37,7 @@ Step 2 — Donor-like (healthy) cohort adjustment (Figures 7.13 and 7.17):
     • Post-dialysis listing in year 1 ≈ 25% − 9.4% = 15.6%
     • With lower first-year dialysis mortality for this age group (~10%):
         p_donor ≈ 0.156 / 0.90 ≈ 0.17
-  Conservative base case rounded down: p = 0.15.
+  Base case: p = _p_donor_like_direct ≈ 0.173.
 
 Sensitivity range: 0.05 (lower; general ESRD) to 0.30 (upper; highly optimistic).
 
@@ -170,8 +170,8 @@ _postdialysis_yr1_age1844 = (
 _survival_yr1_donor_like = 0.90   # USRDS 2023 ADR ESRD Ch.2, age 18-44 ≈ 90-92%
 _p_donor_like_direct = _postdialysis_yr1_age1844 / _survival_yr1_donor_like
 
-# Base case: conservative midpoint, rounded to 2 sig. figs.
-WL_LISTING_PROB_BASE = 0.15
+# Base case: donor-like conditional rate derived above.
+WL_LISTING_PROB_BASE = _p_donor_like_direct
 
 PARAMS = {
     # ── SOURCE DATA ──────────────────────────────────────────────────────
@@ -199,11 +199,10 @@ PARAMS = {
         "Figures 7.13, 7.15, 7.17."
     ),
     "_derivation": (
-        "wl_listing_prob (base 0.15): back-calculated from 3-yr cumulative incidence "
-        "of waitlisting in USRDS Figure 7.15 (general ESRD p≈0.065/yr), then scaled "
-        "upward for the younger/healthier donor-candidate population using age 18-44 "
-        "listing rates from Figures 7.13 and 7.17 (p≈0.17/yr). Conservative base "
-        "case 0.15; sensitivity 0.05-0.30."
+        "wl_listing_prob: conditional post-dialysis listing rate for donor-like "
+        "(age 18-44) cohort, derived as (wl_or_tx_within_1yr_age1844 - "
+        "preemptive_listing_age1844) / P(survive yr1 dialysis, age18-44) = "
+        "(0.25 - 0.094) / 0.90 ≈ 0.173/yr. Sensitivity 0.05-0.30."
     ),
 }
 
@@ -226,7 +225,7 @@ def main():
     print(f"    Back-calculated p, general ESRD:   {_p_general:.3f}/yr")
     print(f"    Estimated p, donor-like cohort:    {_p_donor_like_direct:.3f}/yr (direct)")
     print()
-    print(f"    BASE CASE  wl_listing_prob:        {WL_LISTING_PROB_BASE}  (was 0.75)")
+    print(f"    BASE CASE  wl_listing_prob:        {WL_LISTING_PROB_BASE:.4f}  (donor-like direct)")
     print(f"    Sensitivity low:                   0.05")
     print(f"    Sensitivity high:                  0.30")
     print("\nDone.")

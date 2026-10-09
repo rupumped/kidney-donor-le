@@ -18,9 +18,9 @@
   "usrds_esrd7_fig711_wl_pct_transplanted_3yr": 0.5,
   "wl_listing_prob_general_esrd": 0.0647,
   "wl_listing_prob_donor_like_direct": 0.1733,
-  "wl_listing_prob": 0.15,
+  "wl_listing_prob": 0.17333333333333334,
   "wl_listing_prob_sens_low": 0.05,
   "wl_listing_prob_sens_high": 0.3,
   "_source": "USRDS 2025 ADR, ESRD Vol. Chapter 7: Kidney Transplant. Figures 7.13, 7.15, 7.17.",
-  "_derivation": "wl_listing_prob (base 0.15): back-calculated from 3-yr cumulative incidence of waitlisting in USRDS Figure 7.15 (general ESRD p\u22480.065/yr), then scaled upward for the younger/healthier donor-candidate population using age 18-44 listing rates from Figures 7.13 and 7.17 (p\u22480.17/yr). Conservative base case 0.15; sensitivity 0.05-0.30."
+  "_derivation": "wl_listing_prob: conditional post-dialysis listing rate for donor-like (age 18-44) cohort, derived as (wl_or_tx_within_1yr_age1844 - preemptive_listing_age1844) / P(survive yr1 dialysis, age18-44) = (0.25 - 0.094) / 0.90 \u2248 0.173/yr. Sensitivity 0.05-0.30."
 }

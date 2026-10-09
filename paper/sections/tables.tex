@@ -5,38 +5,38 @@
 
 \begin{table}[!ht]
 	\centering
-	\caption{\textbf{One-way sensitivity analysis:} parameter values tested and the resulting change in life expectancy (donor arm minus non-donor arm), age~40 at donation, all other parameters held at base-case values, including the donor all-cause mortality HR, which is held at its base-case time-varying profile rather than perturbed here (see Table~\ref{tab:hr-structural} and Figure~\ref{fig:hr_scenarios} for sensitivity to that assumption). Negative $\Delta\text{LE}$ values indicate a net life-expectancy cost of donation relative to the matched non-donor arm under the value tested; positive values indicate a donor-arm benefit. The ``$8\times$ controls (base case)'' row reproduces the overall base-case result reported in the main results \textcolor{red}{($\Delta\text{LE}~=-891.0$~d, analytic cohort)}.}
+	\caption{\textbf{One-way sensitivity analysis:} parameter values tested and the resulting change in life expectancy (donor arm minus non-donor arm), age~40 at donation, all other parameters held at base-case values, including the donor all-cause mortality HR, which is held at its base-case time-varying profile rather than perturbed here (see Table~\ref{tab:hr-structural} and Figure~\ref{fig:hr_scenarios} for sensitivity to that assumption). Negative $\Delta\text{LE}$ values indicate a net life-expectancy cost of donation relative to the matched non-donor arm under the value tested; positive values indicate a donor-arm benefit. The ``$8\times$ controls (base case)'' row reproduces the overall base-case result reported in the main results \textcolor{red}{($\Delta\text{LE}~=-891.3$~d, analytic cohort)}.}
 	\label{tab:owsa}
 	\begin{tabular}{lrr}
 	\toprule
 	Parameter (value tested) & $\Delta\text{LE}$ (days) & vs.\ base (days) \\
 	\midrule
 	\multicolumn{3}{l}{\textit{ESRD relative risk, donor vs.\ non-donor (base case: $8\times$, 30.8/10{,}000)}} \\
-	\quad $2\times$ controls & \textcolor{red}{$-858.0$} & \textcolor{red}{$+33.0$} \\
-	\quad $4\times$ controls & \textcolor{red}{$-869.3$} & \textcolor{red}{$+21.7$} \\
-	\quad $8\times$ controls (base case) & \textcolor{red}{$-891.0$} & 0.0 \\
-	\quad $11\times$ controls (Mjøen upper bound) & \textcolor{red}{$-908.1$} & \textcolor{red}{$-17.1$} \\
+	\quad $2\times$ controls & \textcolor{red}{$-858.3$} & \textcolor{red}{$+33.0$} \\
+	\quad $4\times$ controls & \textcolor{red}{$-869.6$} & \textcolor{red}{$+21.7$} \\
+	\quad $8\times$ controls (base case) & \textcolor{red}{$-891.3$} & 0.0 \\
+	\quad $11\times$ controls (Mjøen et~al.\ point estimate) & \textcolor{red}{$-908.4$} & \textcolor{red}{$-17.1$} \\
 	\midrule
-	\multicolumn{3}{l}{\textit{Standard waitlist mean wait (base case: 1{,}765~d)}} \\
-	\quad 24 months (730~d) & \textcolor{red}{$-891.2$} & \textcolor{red}{$-0.2$} \\
-	\quad 61 months (1{,}857~d, pre-KAS250) & \textcolor{red}{$-891.0$} & 0.0 \\
+	\multicolumn{3}{l}{\textit{Standard waitlist mean wait (base case: \textcolor{red}{1{,}437~d})}} \\
+	\quad 24 months (730~d) & \textcolor{red}{$-891.5$} & \textcolor{red}{$-0.2$} \\
+	\quad 61 months (1{,}857~d, pre-KAS250)~\cite{punjala_determinants_2024} & \textcolor{red}{$-891.3$} & 0.0 \\
 	\midrule
 	\multicolumn{3}{l}{\textit{Priority (PLD) waitlist mean wait (base case: $\approx 148$~d, from 102.6~d median via $\mu=\text{median}/\ln 2$)}} \\
-	\quad 50~d median ($\approx 72$~d mean, optimistic) & \textcolor{red}{$-890.8$} & \textcolor{red}{$+0.2$} \\
-	\quad 200~d median ($\approx 289$~d mean) & \textcolor{red}{$-891.8$} & \textcolor{red}{$-0.8$} \\
-	\quad No priority access (PLD~$=$~standard, 1{,}765~d mean) & \textcolor{red}{$-897.7$} & \textcolor{red}{$-6.7$} \\
+	\quad 50~d median ($\approx 72$~d mean, optimistic) & \textcolor{red}{$-891.1$} & \textcolor{red}{$+0.2$} \\
+	\quad 200~d median ($\approx 289$~d mean) & \textcolor{red}{$-892.2$} & \textcolor{red}{$-0.9$} \\
+	\quad No priority access (PLD~$=$~standard, \textcolor{red}{1{,}437~d} mean) & \textcolor{red}{$-897.5$} & \textcolor{red}{$-6.2$} \\
 	\midrule
 	\multicolumn{3}{l}{\textit{\textcolor{red}{Dialysis mortality (base case: USRDS 2019 age-specific rates)}}} \\
-	\quad \textcolor{red}{$-50\%$} & \textcolor{red}{$-871.1$} & \textcolor{red}{$+19.9$} \\
-	\quad \textcolor{red}{$+50\%$} & \textcolor{red}{$-907.1$} & \textcolor{red}{$-16.1$} \\
+	\quad \textcolor{red}{$-50\%$} & \textcolor{red}{$-871.2$} & \textcolor{red}{$+20.1$} \\
+	\quad \textcolor{red}{$+50\%$} & \textcolor{red}{$-907.4$} & \textcolor{red}{$-16.1$} \\
 	\midrule
 	\multicolumn{3}{l}{\textit{Post-transplant survival (base case: DDKT quality)}} \\
-	\quad LDKT quality (SRTR Figure~KI~76) & \textcolor{red}{$-883.3$} & \textcolor{red}{$+7.7$} \\
+	\quad LDKT quality (SRTR Figure~KI~76) & \textcolor{red}{$-883.7$} & \textcolor{red}{$+7.6$} \\
 	\midrule
 	\multicolumn{3}{l}{\textit{\textcolor{red}{Prior-donor post-ESRD inputs (base case: Muzaale et~al.\ 2016)}}} \\
-	\quad \textcolor{red}{General ESRD population inputs} & \textcolor{red}{$-925.9$} & \textcolor{red}{$-34.9$} \\
-	\quad \textcolor{red}{Donor dialysis multiplier 0.4 (base 0.78)} & \textcolor{red}{$-866.5$} & \textcolor{red}{$+24.5$} \\
-	\quad \textcolor{red}{Donor dialysis multiplier 1.0} & \textcolor{red}{$-902.5$} & \textcolor{red}{$-11.5$} \\
+	\quad \textcolor{red}{General ESRD population inputs} & \textcolor{red}{$-924.0$} & \textcolor{red}{$-32.7$} \\
+	\quad \textcolor{red}{Donor dialysis multiplier 0.4 (base 0.78)} & \textcolor{red}{$-866.8$} & \textcolor{red}{$+24.5$} \\
+	\quad \textcolor{red}{Donor dialysis multiplier 1.0} & \textcolor{red}{$-902.8$} & \textcolor{red}{$-11.5$} \\
 	\bottomrule
 	\end{tabular}
 \end{table}
@@ -50,10 +50,10 @@
 	HR assumption & $\Delta\text{LE}$ (days) \\
 	\midrule
 	% HR~$=0.60$ flat (O'Keeffe et~al.\ 2018 pooled estimate) & $+1{,}855.8$ \\
-	HR~$=1.00$ flat (no excess mortality) & \textcolor{red}{$-54.7$} \\
-	HR $1.00\rightarrow 1.30$, years 10--15 (base case) & \textcolor{red}{$-891.0$} \\
-	HR~$=1.30$ flat (Mjøen et~al.\ 2014 point estimate) & \textcolor{red}{$-1{,}066.2$} \\
-	HR~$=1.52$ flat (Mjøen et~al.\ 2014 upper 95\%~CI) & \textcolor{red}{$-1{,}673.9$} \\
+	HR~$=1.00$ flat (no excess mortality) & \textcolor{red}{$-55.0$} \\
+	HR $1.00\rightarrow 1.30$, years 10--15 (base case) & \textcolor{red}{$-891.3$} \\
+	HR~$=1.30$ flat (Mjøen et~al.\ 2014 point estimate) & \textcolor{red}{$-1{,}066.5$} \\
+	HR~$=1.52$ flat (Mjøen et~al.\ 2014 upper 95\%~CI) & \textcolor{red}{$-1{,}674.2$} \\
 	\bottomrule
 	\end{tabular}
 \end{table}
