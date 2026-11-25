@@ -1,13 +1,13 @@
 DOCNAME=main
 OPEN := $(shell grep -qi microsoft /proc/version 2>/dev/null && echo wslview || echo open)
-TEMPLATE_URL=https://uk.sagepub.com/sites/default/files/sage_latex_template_4.zip
+TEMPLATE_URL=https://www.sagepub.com/docs/default-source/rp-pages/info-for-authors/sage-latex-template.zip
 
 all: report
 
 .PHONY: clean distclean
 
 sagej.cls SageV.bst:
-	curl -L -o template.zip $(TEMPLATE_URL)
+	curl -fL -o template.zip $(TEMPLATE_URL)
 	unzip -jo template.zip 'sagej.cls' 'SageV.bst'
 	rm -f template.zip
 
@@ -16,8 +16,9 @@ report: sagej.cls SageV.bst
 	bibtex $(DOCNAME).aux
 	pdflatex $(DOCNAME).tex
 	pdflatex $(DOCNAME).tex
+	for f in title_page declarations info_page; do pdflatex $$f.tex; pdflatex $$f.tex; done
 	@echo "Word Count:"
-	detex $(DOCNAME).tex | wc -w
+	cat sections/background.tex sections/design.tex sections/results.tex sections/conc.tex | detex | wc -w
 
 view: report
 	$(OPEN) $(DOCNAME).pdf

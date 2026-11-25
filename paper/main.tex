@@ -1,56 +1,30 @@
+% FILE 4 of 4: Anonymized main manuscript. Must contain NO author name,
+% affiliation, institution, or self-identifying citations or links.
+% Title page, declarations, and info page are separate files (see Makefile).
 \documentclass[Afour,sagev,times]{sagej}
 
 \usepackage{moreverb,url}
 \usepackage{booktabs}
 \usepackage{xcolor}
 
-\usepackage[colorlinks,bookmarksopen,bookmarksnumbered,citecolor=red,urlcolor=red]{hyperref}
-
-% \newcommand\BibTeX{{\rmfamily B\kern-.05em \textsc{i\kern-.025em b}\kern-.08em
-% T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\usepackage[colorlinks,bookmarksopen,bookmarksnumbered,citecolor=red,urlcolor=red,pdfauthor={}]{hyperref}
+\input{metadata}
 
 \def\volumeyear{2026}
 
 \begin{document}
 
-\runninghead{Selby, LE Changes Due to Kidney Donation}
-
-\title{Life Expectancy Changes Due to Kidney Donation Across Race, Sex, and Age}
-
-\author{Nicholas S. Selby, PhD\affilnum{1}}
-% \author{Nicholas S. Selby, PhD\affilnum{1} and X\affilnum{2}}
-
-\affiliation{
-	\affilnum{1}Renewvia Solar Ethiopia PLC
-	% \affilnum{1}Renewvia Solar Ethiopia PLC\\
-}
-
-\corrauth{Nicholas S. Selby, Renewvia Solar Ethiopia PLC
-House No. 174/175, Saya Building, 5th Floor
-Bole sub-city, Woreda 03
-Addis Ababa, Ethiopia\\[6pt]
-\textbf{Word count:} approximately 7,400 words}
-
-\email{nicholas.selby@renewvia.com}
-
-\begin{abstract}
-\input{sections/abstract}
-\end{abstract}
-
-\keywords{living kidney donation, life expectancy, Markov model, end-stage renal disease, health disparities}
+\runninghead{\shorttitle}
+\title{\papertitle}
 
 \maketitle
-
-\section*{Highlights}
-\label{sec:highlights}
-\input{sections/highlights}
 
 \input{sections/background}
 \input{sections/design}
 \input{sections/results}
 \input{sections/conc}
 
-\input{sections/acks_declarations}
+\input{sections/demographics}
 
 \bibliographystyle{SageV}
 \bibliography{references}

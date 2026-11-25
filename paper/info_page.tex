@@ -1,0 +1,28 @@
+% FILE 3 of 4: Anonymized information page (title, abstract, keywords,
+% highlights). Must contain NO author-identifying information.
+\documentclass[Afour,sagev,times]{sagej}
+
+\usepackage{xcolor}
+\usepackage[colorlinks,bookmarksopen,bookmarksnumbered,citecolor=red,urlcolor=red,pdfauthor={}]{hyperref}
+\input{metadata}
+
+\def\volumeyear{2026}
+
+\begin{document}
+
+\runninghead{\shorttitle}
+\title{\papertitle}
+
+\begin{abstract}
+\input{sections/abstract}
+\end{abstract}
+
+\keywords{\paperkeywords}
+
+\maketitle
+
+\section*{Highlights}
+\label{sec:highlights}
+\input{sections/highlights}
+
+\end{document}
