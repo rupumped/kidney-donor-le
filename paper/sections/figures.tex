@@ -4,15 +4,22 @@
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\linewidth]{figures/markov_model_kidney_donation.pdf}
-	\caption{Markov state-transition model for kidney donation. Boxes represent the seven mutually exclusive health states; arrows show permitted transitions. The donor arm (upper pathway) routes ESRD-onset patients to the Priority waitlist; the non-donor arm routes to the Standard waitlist. The Dead state is absorbing.}
+	\caption{\textbf{Markov state-transition model for kidney donation.} Boxes represent the six mutually exclusive health states; arrows show permitted transitions. The donor arm (upper pathway) routes ESRD-onset patients to the Priority waitlist; the non-donor arm routes to the Standard waitlist. The Dead state is absorbing.}
 	\label{fig:markov}
 \end{figure}
 
 \begin{figure}[ht]
 	\centering
-	\includegraphics[width=\linewidth]{figures/kidney_model_age_race_sex_matrix.pdf}
+	\includegraphics[width=\linewidth]{figures/kidney_model_age_race_sex_matrix_strat.pdf}
 	\caption{\textbf{Life-expectancy impact of kidney donation by age, race, and sex.} Each cell shows $\Delta\text{LE}$ (donor minus non-donor, days) for the indicated sex panel, race row, and age-at-donation column. Age at donation dominates: costs range from 1{,}291~days for a Black male donor at age~25 to 555~days for a Black male donor at age~55. At age~25, the largest within-age contrast (Black male vs.\ White female) is 1{,}291 vs.\ 1{,}026~days, respectively, a 26\% difference; by age~55, race and sex differences are small.}
 	\label{fig:age_race_sex_matrix}
+\end{figure}
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width=\linewidth]{figures/kidney_model_D_age_subgroup.pdf}
+	\caption{\textbf{Life-expectancy impact of kidney donation by age at donation (base case).} $\Delta\text{LE}$ (donor minus non-donor, days) using the Muzaale 2014 pooled-cohort 15-year ESRD incidence (overall race, overall sex), age-adjusted by the Grams 2016 non-Black age gradient.}
+	\label{fig:age_subgroup}
 \end{figure}
 
 \begin{figure}[ht]

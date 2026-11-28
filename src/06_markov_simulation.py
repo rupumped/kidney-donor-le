@@ -37,6 +37,7 @@ Outputs in results/:
   kidney_model_age_sex_matrix.pdf       — age × sex ΔLE heatmap
   kidney_model_sex_race_matrix.pdf      — sex × race ΔLE heatmap
   kidney_model_age_race_sex_matrix.pdf  — age × race faceted by sex (all three variables)
+  kidney_model_age_race_sex_matrix_strat.pdf  — same, race-stratified rows only (no mixed Overall)
 """
 
 import argparse
@@ -555,7 +556,7 @@ def run_hr_scenarios(age_at_donation=40):
 # ── AGE SUBGROUP ANALYSIS ─────────────────────────────────────────────────────
 def run_age_subgroups():
 	print("\nRunning age-at-donation subgroup analysis (analytic)...")
-	ages = [25, 35, 40, 45, 55]
+	ages = [25, 30, 35, 40, 45, 50, 55]
 	results = {}
 	for age in ages:
 		p    = BASE.copy()
@@ -841,16 +842,19 @@ def make_fig_hr_scenarios(hr_res):
 # ── (D) AGE SUBGROUP ─────────────────────────────────────────────────────────
 def make_fig_age_subgroup(age_res):
 	fig, ax = plt.subplots(figsize=(8, 4))
-	fig.patch.set_facecolor("#FAFAF8")
+	fig.patch.set_facecolor("#FFFFFF")
 	ages_s  = sorted(age_res.keys())
 	diffs_d = [age_res[a]["diff"] * 365.25 for a in ages_s]
 	bar_cols = [_TEAL if d >= 0 else _CORAL for d in diffs_d]
 	ax.bar(range(len(ages_s)), diffs_d, color=bar_cols, alpha=0.8, width=0.6)
 	ax.axhline(0, color=_GRAY, lw=1.2)
 	ax.set_xticks(range(len(ages_s)))
-	ax.set_xticklabels([f"Age {a}" for a in ages_s], fontsize=9)
-	ax.set_ylabel("ΔLE (days)", fontsize=9)
+	ax.set_xticklabels([f"{a}" for a in ages_s], fontsize=15)
+	ax.set_ylabel("ΔLE (days)", fontsize=15)
+	ax.set_xlabel("Age at donation (years)", fontsize=15)
 	_style_ax(ax)
+	ax.tick_params(axis="x", labelsize=13)
+	ax.tick_params(axis="y", labelsize=13)
 	fig.tight_layout()
 	return fig
 
@@ -1308,6 +1312,116 @@ def make_age_race_sex_matrix():
 	return fig
 
 
+# ── AGE × RACE × SEX, RACE-STRATIFIED ONLY (no mixed "Overall" race row) ─────
+def make_age_race_sex_matrix_strat():
+	"""
+	Age × race heatmaps faceted by sex, race rows restricted to White and Black.
+
+	The "Overall" race row is omitted because it is parameterized from a
+	different source study (Muzaale 2014 pooled) than the race-stratified rows
+	(Grams 2016), so it need not lie between White and Black and can produce
+	the appearance of a paradox at older donation ages where the two race
+	curves nearly cross.
+	"""
+	ages = [25, 30, 35, 40, 45, 50, 55]
+
+	lt_m_path = DATA_PROC / "lifetable_male_2021.csv"
+	lt_f_path = DATA_PROC / "lifetable_female_2021.csv"
+	lt_male   = load_life_table(lt_m_path if lt_m_path.exists() else None)
+	lt_female = load_life_table(lt_f_path if lt_f_path.exists() else None)
+
+	f_female = 0.635  # SRTR 2023 ADR Figure KI 104: 63.5% of LD donors female (2023)
+	hr_male  = float(BASE.get("hr_male_sex", 1.88))
+	denom    = f_female + (1.0 - f_female) * hr_male
+
+	race_params = {
+		"White": {
+			"esrd_15yr_donor_overall": 0.00227,
+			"esrd_15yr_nondonor":      0.00050,
+			"wl_mort_race_mult": BASE["wl_mort_race_mult_white"],
+			**_scale_posttx_mort(BASE, BASE.get("posttx_annual_mort_white", 0.038)),
+		},
+		"Black": {
+			"esrd_15yr_donor_overall": 0.00747,
+			"esrd_15yr_nondonor":      0.00195,
+			"wl_mort_race_mult": BASE["wl_mort_race_mult_black"],
+			**_scale_posttx_mort(BASE, BASE.get("posttx_annual_mort_black", 0.035)),
+		},
+	}
+
+	sex_specs = {
+		"Female":  {"scale": 1.0 / denom,        "_lt": lt_female},
+		"Overall": {"scale": 1.0,                 "_lt": LIFE_TABLE_QX},
+		"Male":    {"scale": hr_male / denom,      "_lt": lt_male},
+	}
+
+	races = list(race_params.keys())
+	sexes = list(sex_specs.keys())
+
+	matrices = {}
+	for sex in sexes:
+		ss  = sex_specs[sex]
+		lt  = ss["_lt"]
+		mat = np.zeros((len(races), len(ages)))
+		for r, race in enumerate(races):
+			p = BASE.copy()
+			p.update(race_params[race])
+			base_donor    = p["esrd_15yr_donor_overall"] * ss["scale"]
+			base_nondonor = p["esrd_15yr_nondonor"]      * ss["scale"]
+			for a, age in enumerate(ages):
+				if race != "Black":
+					p["esrd_15yr_donor_overall"] = _age_adjust_esrd_nonblack(base_donor, age)
+				else:
+					p["esrd_15yr_donor_overall"] = base_donor
+				nondonor_ref = _GRAMS_NONDONOR.get((race, sex), base_nondonor)
+				p["esrd_15yr_nondonor"] = _age_adjust_esrd_nondonor(nondonor_ref, age,
+																	race=race, sex=sex)
+				le_d  = run_arm_analytic(p, age, donor=True,  life_table=lt)
+				le_nd = run_arm_analytic(p, age, donor=False, life_table=lt)
+				mat[r, a] = (le_d - le_nd) * 365.25
+		matrices[sex] = mat
+
+	print("\nAge x race x sex matrix (dLE, days) [race-stratified only]:")
+	for sex in sexes:
+		for r, race in enumerate(races):
+			row = "  ".join(f"{ages[a]}:{matrices[sex][r, a]:+.1f}" for a in range(len(ages)))
+			print(f"  {sex:<8} {race:<8} {row}")
+
+	mat_min = min(m.min() for m in matrices.values())
+	mat_max = max(m.max() for m in matrices.values())
+
+	fig, axes = plt.subplots(3, 1, figsize=(9, 8), constrained_layout=True)
+	fig.patch.set_facecolor("white")
+
+	im = None
+	for i, (ax, sex) in enumerate(zip(axes, sexes)):
+		mat = matrices[sex]
+		ax.set_facecolor("white")
+		im = ax.imshow(mat, cmap="YlOrRd_r", vmin=mat_min, vmax=mat_max, aspect="auto")
+
+		for r in range(len(races)):
+			for a in range(len(ages)):
+				val = mat[r, a]
+				ax.text(a, r, f"{val:+.0f} d", ha="center", va="center",
+						fontsize=FS_CELL, fontweight="bold", color="black")
+
+		ax.set_xticks(range(len(ages)))
+		is_last = i == len(sexes) - 1
+		ax.set_xticklabels([f"Age {a}" for a in ages] if is_last else [], fontsize=FS_TICK)
+		ax.set_yticks(range(len(races)))
+		ax.set_yticklabels(races, fontsize=FS_TICK)
+		ax.set_xlabel("Age at donation" if is_last else "", fontsize=FS_LABEL)
+		ax.set_title(sex, fontsize=17, fontweight="bold", color="#2C2C2A", pad=6)
+		ax.spines[:].set_visible(False)
+		ax.tick_params(length=0)
+
+	cbar = fig.colorbar(im, ax=axes, fraction=0.05, pad=0.02)
+	cbar.set_label("ΔLE (days): donor − non-donor", fontsize=FS_LABEL)
+	cbar.ax.tick_params(labelsize=11)
+
+	return fig
+
+
 # ── RESULTS TABLE ─────────────────────────────────────────────────────────────
 def make_results_table(base_res, psa_diffs, owsa_res, age_res, race_res, sex_res=None,
 						hr_res=None):
@@ -1421,6 +1535,9 @@ PLOT_REGISTRY = {
 	"age_race_sex_matrix": {"deps": [],
 							 "make": lambda ctx: make_age_race_sex_matrix(),
 							 "file": "kidney_model_age_race_sex_matrix.pdf"},
+	"age_race_sex_matrix_strat": {"deps": [],
+							 "make": lambda ctx: make_age_race_sex_matrix_strat(),
+							 "file": "kidney_model_age_race_sex_matrix_strat.pdf"},
 	"race":                {"deps": ["race"],
 							 "make": lambda ctx: make_race_figure(ctx["race"], age_at_donation=40),
 							 "file": "kidney_model_race.pdf"},

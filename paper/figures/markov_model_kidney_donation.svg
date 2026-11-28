@@ -26,7 +26,7 @@
 <!-- Dialysis (centered between the two WL boxes) -->
 <rect x="240" y="228" width="200" height="56" rx="8" stroke-width="1" style="fill:rgb(249,220,207);stroke:rgb(163,63,32);"/>
 <text x="340" y="250" text-anchor="middle" dominant-baseline="central" style="fill:black;font-size:14px;font-weight:500;">Dialysis</text>
-<text x="340" y="268" text-anchor="middle" dominant-baseline="central" style="fill:black;font-size:12px;">If not pre-emptively listed</text>
+<text x="340" y="268" text-anchor="middle" dominant-baseline="central" style="fill:black;font-size:12px;">If not preemptively listed</text>
 
 <!-- Standard waitlist -->
 <rect x="30" y="353" width="200" height="56" rx="8" stroke-width="1" style="fill:rgb(253,240,213);stroke:rgb(178,111,10);"/>
